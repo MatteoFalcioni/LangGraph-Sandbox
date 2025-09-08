@@ -12,11 +12,12 @@ def run_python_in_docker(
     code: str,
     *,
     image: str = "py-sandbox:latest",
-    files: Optional[Dict[str, bytes]] = None,
+    files: dict | None = None,
     timeout_s: int = 20,
     mem_limit: str = "512m",
-    nano_cpus: int = 1_000_000_000,  # ~1 CPU
-) -> Dict[str, Any]:
+    nano_cpus: int = 1_000_000_000,
+    extra_ro_mounts: dict[str, str] | None = None,  # {host_path: "/container/path"}
+) -> dict:
     """
     Execute `code` inside an ephemeral Docker container with a mounted /work dir.
     Returns: { stdout, stderr, exit_code, artifacts }
@@ -39,21 +40,25 @@ def run_python_in_docker(
         # Ensure artifacts dir exists (user code can write here)
         (run_dir / "artifacts").mkdir(exist_ok=True)
 
-        # Create the container
+        volumes = {
+        str(run_dir): {"bind": "/work", "mode": "rw"},
+        }
+        # Add read-only mounts
+        if extra_ro_mounts:
+            for host_p, ctr_p in extra_ro_mounts.items():
+                volumes[host_p] = {"bind": ctr_p, "mode": "ro"}
+
+        # create the container
         container = client.containers.create(
             image=image,
             command=["python", "/work/run.py"],
             working_dir="/work",
             user="1000:1000",
             network_disabled=True,
-            stdin_open=False,
-            tty=False,
             mem_limit=mem_limit,
             nano_cpus=nano_cpus,
             pids_limit=128,
-            volumes={
-                str(run_dir): {"bind": "/work", "mode": "rw"},
-            },
+            volumes=volumes,
         )
 
         try:
