@@ -6,7 +6,12 @@ import uuid
 
 if __name__ == "__main__":
 
-    load_dotenv()
+    env = load_dotenv()
+    if env == True: 
+        print("Loaded .env file")
+    else:
+        print("No .env file found")
+
     builder = get_builder()
 
     memory = InMemorySaver()
@@ -33,4 +38,4 @@ if __name__ == "__main__":
 
         ai_message = result["messages"][-1].content
 
-        print(f'\AI: {ai_message}\n')
+        print(f'\nAI: {ai_message}\n')

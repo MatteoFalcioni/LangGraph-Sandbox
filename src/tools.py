@@ -5,7 +5,7 @@ from typing_extensions import Annotated
 from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
-from sandbox_runner import run_python_in_docker
+from .sandbox_runner import run_python_in_docker
 import os
 
 # ---- args schema ----
@@ -27,7 +27,7 @@ def code_sandbox(
     
     result = run_python_in_docker(
         code,
-        extra_ro_mounts = {os.path.abspath("llm_data") : "/data/"},  # local_path: container_path
+        extra_ro_mounts = {os.path.abspath("llm_data") : "/data"},  # local_path: container_path
         timeout_s=20,
         mem_limit="512m",
         nano_cpus=1_000_000_000,

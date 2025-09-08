@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from .tools import code_sandbox
 from .prompt import PROMPT
 
-load_dotenv("./../.env")
+load_dotenv()
 
 llm = ChatOpenAI(model="gpt-4.1")
 
