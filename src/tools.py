@@ -31,21 +31,26 @@ def code_sandbox(
         timeout_s=20,
         mem_limit="512m",
         nano_cpus=1_000_000_000,
+        persist_root="outputs",  # promoted artifacts end up here
     )
 
-    # Keep the message lean; include paths to artifacts you can serve from your API.
+    # Keep the message lean; include paths to artifacts - you can serve them from your API.
     payload = {
         "exit_code": result["exit_code"],
-        "stdout": result["stdout"][-4000:],  # trim if huge
-        "workdir": result["workdir"],
+        "stdout": result["stdout"][-4000:],  # trim if large
+        "persist_dir": result["persist_dir"],
+        "run_id": result["run_id"],
+        "artifact_map_count": len(result["artifact_map"]),
     }
 
-    artifact = result["artifacts"]
-    content = json.dumps(payload)
+    # Put the full map in ToolMessage.artifact (structured)
+    tool_msg = ToolMessage(
+        content=json.dumps(payload, ensure_ascii=False),
+        artifact=result["artifact_map"],           # [{container, host}, ...]
+        tool_call_id=tool_call_id,
+    )
 
-    tool_msg = ToolMessage(content=content, artifact=artifact, tool_call_id=tool_call_id)
-
-    # Resume the graph with a ToolMessage
+    # Return result as a ToolMessage
     return Command(
         update={
             "messages": [tool_msg]
