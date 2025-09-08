@@ -7,8 +7,10 @@ This project provides a **Docker-based sandbox** for executing Python code insid
 * **Ephemeral containers**: each tool call spins up a fresh container, ensuring clean state.
 * **Resource isolation**: configurable CPU, memory, and timeout limits.
 * **Dataset mounting**: host datasets (e.g. `src/llm_data/`) mounted read-only at `/data`.
+* **Persistent session folder**: if enabled, `/session` allows sharing intermediate files across tool calls in the same conversation.
 * **Artifact management**: code can write outputs (`.txt`, `.png`, `.csv`, etc.) to `/work/artifacts`; these are automatically copied out to a persistent host folder (`outputs/<run_id>/`).
 * **Artifact mapping**: every run returns a mapping `{container_path → host_path}` so the agent/UI can reference both.
+* **Separate stdout/stderr capture**: logs from the sandbox are returned split into stdout and stderr for easier debugging.
 
 ## Installation
 
@@ -70,5 +72,6 @@ project/
 
 * Use `/data` inside sandbox code to read host datasets.
 * Use `/work/artifacts` to write outputs that will be persisted to `outputs/`.
+* Use `/session` if you need to share files across multiple tool calls.
 * Each run gets a unique `run_id` to keep artifacts separated.
-
+* Both **stdout** and **stderr** are captured and returned separately for debugging.

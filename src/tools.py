@@ -25,9 +25,12 @@ def code_sandbox(
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
     
+    session_id = "conv"  # better: pull from graph state/checkpoint (e.g., run_id/user_id)
+    
     result = run_python_in_docker(
         code,
         extra_ro_mounts = {os.path.abspath("src/llm_data/") : "/data"},  # local_path: container_path
+        session_id=session_id,                 # <— enables /session
         timeout_s=20,
         mem_limit="512m",
         nano_cpus=1_000_000_000,
@@ -38,6 +41,7 @@ def code_sandbox(
     payload = {
         "exit_code": result["exit_code"],
         "stdout": result["stdout"][-4000:],  # trim if large
+        "stderr": result["stderr"][-4000:],  # trim if large
         "persist_dir": result["persist_dir"],
         "run_id": result["run_id"],
         "artifact_map_count": len(result["artifact_map"]),
