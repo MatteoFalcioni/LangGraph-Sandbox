@@ -1,0 +1,15 @@
+langgraph==0.6.7
+langgraph-checkpoint==2.1.0         # keep only if you use it
+langchain-core==0.3.75
+langchain-community==0.3.29         # only if you call community tools
+langchain-openai==0.3.32
+openai==1.106.1
+
+pydantic==2.11.7
+typing_extensions>=4.10
+python-dotenv==1.1.1
+
+docker==7.1.0                       # to start containers
+fastapi==0.116.1                    # only if you expose an API
+uvicorn==0.35.0                     # only if using FastAPI
+orjson==3.10.18                     # optional, fast JSON
