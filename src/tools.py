@@ -27,7 +27,7 @@ def code_sandbox(
     
     result = run_python_in_docker(
         code,
-        extra_ro_mounts = {os.path.abspath("llm_data") : "/data"},  # local_path: container_path
+        extra_ro_mounts = {os.path.abspath("src/llm_data/") : "/data"},  # local_path: container_path
         timeout_s=20,
         mem_limit="512m",
         nano_cpus=1_000_000_000,

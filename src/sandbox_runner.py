@@ -2,7 +2,8 @@
 import tempfile
 from pathlib import Path
 from typing import List
-import docker  # pip install docker
+import docker 
+import os
 
 class DockerSandboxError(Exception):
     pass
@@ -46,6 +47,12 @@ def run_python_in_docker(
         if extra_ro_mounts:
             for host_p, ctr_p in extra_ro_mounts.items():
                 volumes[host_p] = {"bind": ctr_p, "mode": "ro"}
+
+        for host_p, ctr_p in (extra_ro_mounts or {}).items():
+            if not os.path.exists(host_p):
+                raise DockerSandboxError(f"Mount source does not exist: {host_p} -> {ctr_p}")
+            if not any(Path(host_p).rglob("*")):
+                print(f"[warn] Host mount is empty: {host_p}")
 
         # create the container
         container = client.containers.create(
