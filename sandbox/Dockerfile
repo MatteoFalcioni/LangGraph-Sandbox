@@ -1,15 +1,16 @@
-# sandbox/Dockerfile
 FROM python:3.11-slim
 
-# install libs you want available in the sandbox
-RUN pip install --no-cache-dir numpy pandas matplotlib geopandas pyarrow
+RUN pip install --no-cache-dir numpy pandas matplotlib geopandas pyarrow fastapi uvicorn
 
-# Create non-root user
 RUN useradd -m -u 1000 sandbox
-WORKDIR /work
+WORKDIR /app
 
-# Security-hardening basics
+COPY src/repl_server.py /app/repl_server.py
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 USER sandbox
+
+EXPOSE 9000
+CMD ["uvicorn", "repl_server:app", "--host", "0.0.0.0", "--port", "9000"]
