@@ -4,3 +4,4 @@ outputs/
 sessions/
 /blobstore/
 /artifacts.db
+.pytest_cache
