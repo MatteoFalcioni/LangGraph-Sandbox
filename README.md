@@ -64,26 +64,29 @@ sessions/<session_id>/artifacts/output.txt
 ```
 
 ## Project Structure
-
 ```
 project/
-├── outputs/              # per-run artifacts (ephemeral mode)
-├── sessions/             # per-session folders (session-pinned mode)
-├── sandbox/              # Dockerfile for sandbox image
-│   └── Dockerfile
+├── Dockerfile                     # sandbox image (repl_server inside)
+├── sessions/                      # per-session folders (session-pinned mode)
+│   └── …                          # e.g., sessions/conv/artifacts/...
+├── outputs/                       # per-run artifacts (ephemeral mode, legacy)
 ├── src/
-│   ├── llm_data/         # mounted datasets (RO at /data)
 │   ├── __init__.py
-│   ├── make_graph.py     # build LangGraph graph
-│   ├── prompt.py         # system prompt templates
-│   ├── repl_server.py    # REPL server running inside container
-│   ├── session_manager.py# host-side session lifecycle manager
-│   ├── sandbox_runner.py # legacy ephemeral execution path
-│   └── tools.py          # LangGraph tool wrapper
+│   ├── llm_data/                  # datasets mounted RO at /data
+│   ├── graph/
+│   │   ├── code_exec_tool.py      # LangGraph tool (calls SessionManager)
+│   │   ├── make_graph.py          # build LangGraph graph
+│   │   └── prompt.py              # system prompts
+│   └── sandbox/
+│       ├── repl_server.py         # runs INSIDE container (FastAPI REPL)
+│       └── session_manager.py     # host-side session lifecycle + artifacts
+├── tests/
+│   └── test_session.py            # tests
 ├── .env
 ├── .gitignore
-├── main.py               # entrypoint to run the graph
-└── README.md
+├── main.py                        # app entrypoint (starts LangGraph app)
+├── README.md
+└── requirements.txt               # host deps: docker, httpx, langgraph, etc.
 ```
 
 ## Notes
@@ -93,4 +96,3 @@ project/
 * In ephemeral mode, use `/work/artifacts` → artifacts will be promoted under `outputs/<run_id>/`.
 * Each session or run returns an `artifact_map` so the UI can link container paths to host paths.
 * Both **stdout** and **stderr** are captured and returned separately for debugging.
-* Use `reset_sandbox` tool (if enabled) to stop a running session and clean up its container.
