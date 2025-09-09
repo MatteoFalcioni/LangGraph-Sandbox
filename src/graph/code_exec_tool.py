@@ -48,18 +48,16 @@ def code_sandbox(
     result = _manager.exec(sid, code, timeout=30)  # {ok, stdout, error?, artifact_map, session_dir}
 
     payload = {
-        "ok": result.get("ok", False),
-        "stdout": (result.get("stdout") or "")[-4000:],
-        "error": (result.get("error") or "")[-4000:] if not result.get("ok", False) else "",
-        "session_key": sid,
-        "session_dir": result.get("session_dir"),
-        "artifact_count": len(result.get("artifact_map", [])),
-        "hint": "Write files to /session/artifacts to persist & expose them.",
+        "stdout": result.get("stdout", ""),
+        "stderr": result.get("error", "") or result.get("stderr", ""),
+        "session_dir": result.get("session_dir", ""),
     }
+
+    artifacts = result.get("artifacts", []), # new
 
     tool_msg = ToolMessage(
         content=json.dumps(payload, ensure_ascii=False),
-        artifact=result.get("artifact_map", []),  # [{container, host}, ...]
+        artifact=artifacts,
         tool_call_id=tool_call_id,
     )
 
