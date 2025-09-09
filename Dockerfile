@@ -9,7 +9,7 @@ RUN useradd -m -u 1000 sandbox
 WORKDIR /app
 
 # REPL server that keeps state in RAM
-COPY src/repl_server.py /app/repl_server.py
+COPY src/sandbox/repl_server.py /app/repl_server.py
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
