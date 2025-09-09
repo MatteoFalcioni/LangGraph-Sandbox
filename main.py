@@ -1,4 +1,4 @@
-from src.make_graph import get_builder
+from src.graph.make_graph import get_builder
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv

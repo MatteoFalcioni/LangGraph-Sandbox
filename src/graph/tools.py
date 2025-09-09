@@ -6,7 +6,7 @@ from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 
-from .session_manager import SessionManager
+from ..sandbox.session_manager import SessionManager
 
 # ---- session manager singleton (host-side) ----
 # Mount datasets (RO) at /data inside the sandbox; keep per-session files in ./sessions/<sid>
