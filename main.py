@@ -1,8 +1,9 @@
 from src.graph.make_graph import get_builder
 from langgraph.checkpoint.memory import InMemorySaver
-from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 import uuid
+
+from src.artifacts.store import ensure_artifact_store
 
 if __name__ == "__main__":
 
@@ -11,6 +12,8 @@ if __name__ == "__main__":
         print("Loaded .env file")
     else:
         print("No .env file found")
+
+    ensure_artifact_store() # Make sure artifact store is ready
 
     builder = get_builder()
 

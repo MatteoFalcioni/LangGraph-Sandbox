@@ -2,3 +2,5 @@
 *pyc
 outputs/
 sessions/
+/blobstore/
+/artifacts.db
