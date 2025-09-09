@@ -29,7 +29,8 @@ In this version, the sandbox not only keeps state across calls, but also persist
   - Indexed in a SQLite database `artifacts.db` with metadata.
   - Deduplicated (same file only stored once).
   - Linked to the session/run/tool call.
-  - Returned as clean **descriptors** with `id`, `name`, `size`, `mime`, `sha256`, `created_at`.
+  - URL injection into descriptors: tools can directly return ready-to-click download links.
+  - Returned as clean **descriptors** with `id`, `name`, `size`, `mime`, `sha256`, `created_at`, `url`.
 - ✅ **Download API:** FastAPI endpoints to fetch artifacts by ID with short-lived signed tokens.
 - ✅ **Artifact reader:** host-side helpers to load artifacts by ID as bytes, text, or even pandas DataFrames (CSV/Parquet).
 
@@ -135,6 +136,5 @@ project/
 ## Next Steps
 
 - Add **quotas and retention policies** (per-session max size, automatic cleanup of old artifacts).
-- Add **URL injection into descriptors** so tools can directly return ready-to-click download links.
 - Swap SQLite/blobstore to **Postgres + S3/MinIO** for scalability without changing the tool contract.
 - Extend the reader to support **image previews or HTML rendering** for richer UI integrations.
