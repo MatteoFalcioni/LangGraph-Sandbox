@@ -10,6 +10,9 @@ import docker           # Host-side Docker SDK (controls containers)
 import httpx            # Lightweight HTTP client to talk to the in-container REPL
 from pathlib import Path
 
+from src.artifacts.ingest import ingest_files
+
+
 # Docker exposes port mappings as "<container_port>/tcp" in the attrs.
 REPL_PORT = "9000/tcp"
 
@@ -202,8 +205,8 @@ class SessionManager:
           2) Snapshot the set of artifact files before execution.
           3) POST the code to the REPL's /exec endpoint.
           4) Snapshot again after execution and diff to find newly created files.
-          5) Build an artifact_map of [{container: '/session/...', host: '<abs host path>'}].
-          6) Return the REPL result enriched with artifact_map and session_dir.
+          5) Ingest the new files into the artifact store (dedup + metadata).
+          6) Return the REPL result enriched with artifacts (descriptors) and session_dir
 
         Returns dict like:
           {
@@ -240,16 +243,21 @@ class SessionManager:
         new_rel_paths = sorted(after - before)
 
         # --- Build a stable container/host mapping for the caller/UI.
-        artifact_map = []
-        for rel in new_rel_paths:
-            host_path = (info.session_dir / rel).resolve()  # absolute host path
-            # Mirror the mount point inside the container.
-            # If rel == "artifacts/foo.png", then container path is "/session/artifacts/foo.png"
-            ctr_path = f"/session/{rel}"
-            artifact_map.append({"container": ctr_path, "host": str(host_path)})
+        # --- Convert relative paths to absolute HOST paths for ingest.
+        new_host_files = [(info.session_dir / rel).resolve() for rel in new_rel_paths]
+
+        # --- Ingest into the local artifact store (dedup, metadata, delete staging files).
+        descriptors = ingest_files(
+            new_host_files=new_host_files,
+            session_id=session_key,   # reuse your session_key
+            run_id=None,              # pass a real run_id if you have it
+            tool_call_id=None,        # optional; pass one if you have it
+        )
 
         # Enrich and return the REPL response.
-        result["artifact_map"] = artifact_map
+        # Keep legacy keys for one release if you want backward compatibility.
+        result["artifacts"] = descriptors          # ✅ new, stable contract
+        result["artifact_map"] = []                # optional: keep empty during transition
         result["session_dir"] = str(info.session_dir)
         return result
 
