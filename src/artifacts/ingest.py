@@ -29,6 +29,7 @@ from typing import Iterable, List, Dict, Optional
 from datetime import datetime, timezone
 
 from .store import _resolve_paths, _connect 
+from .tokens import create_download_url
 
 
 # ---------- small helpers ----------
@@ -139,17 +140,25 @@ def ingest_files(
             )
             conn.commit()
 
-            # Remove the original from the session folder (keep containers lean)
-            _safe_delete(src)
-
-            descriptors.append({
+            desc = {
                 "id": artifact_id,
                 "name": src.name,
                 "mime": mime,
                 "size": size,
                 "sha256": sha,
                 "created_at": created_at,
-            })
+            }
+            # Optional URL injection (if env is configured)
+            try:
+                desc["url"] = create_download_url(artifact_id)
+            except Exception:
+                # No PUBLIC_BASE_URL or SECRET set; descriptor remains without url
+                pass
+
+            # Remove the original from the session folder (keep containers lean)
+            _safe_delete(src)
+
+            descriptors.append(desc)
 
     return descriptors
 

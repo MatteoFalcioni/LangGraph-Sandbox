@@ -51,3 +51,18 @@ def verify_token(token: str) -> Dict[str, str | int]:
         raise RuntimeError("Token expired")
 
     return {"artifact_id": artifact_id, "exp": exp}
+
+def create_download_url(artifact_id: str) -> str:
+    """
+    Build a ready-to-click URL for the artifact:
+      {PUBLIC_BASE_URL}/artifacts/{id}?token=...
+    Requires:
+      - ARTIFACTS_PUBLIC_BASE_URL
+      - ARTIFACTS_TOKEN_SECRET
+    """
+    base = os.getenv("ARTIFACTS_PUBLIC_BASE_URL")
+    if not base:
+        raise RuntimeError("ARTIFACTS_PUBLIC_BASE_URL not set")
+    token = create_token(artifact_id)
+    base = base.rstrip("/")
+    return f"{base}/artifacts/{artifact_id}?token={token}"
