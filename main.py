@@ -48,3 +48,13 @@ if __name__ == "__main__":
         ai_message = result["messages"][-1].content
 
         print(f'\nAI: {ai_message}\n')
+
+    # in your app with UI you can then read artifacts produced in the session and stored in the db 
+    # Example: reading artifacts produced during the session
+    '''for m in result["messages"]:
+        if m.type == "tool" and "artifacts" in m.content:
+            for art in m.content["artifacts"]:
+                meta = get_metadata(art["id"])
+                print("Artifact available:", meta)
+            if meta["mime"].startswith("text/"):
+                print("Preview:", read_text(art["id"], max_bytes=200))'''
