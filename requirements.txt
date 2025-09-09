@@ -13,3 +13,4 @@ docker==7.1.0                       # to start containers
 fastapi==0.116.1                    # only if you expose an API
 uvicorn==0.35.0                     # only if using FastAPI
 orjson==3.10.18                     # optional, fast JSON
+httpx

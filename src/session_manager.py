@@ -2,6 +2,7 @@
 import time
 import uuid
 from typing import Dict, Optional
+from pathlib import Path    
 
 import docker
 import httpx
@@ -31,6 +32,15 @@ class SessionManager:
                 except Exception:
                     pass
                 self.sessions.pop(sid, None)
+
+    def _list_artifact_files(self, session_dir: Path) -> set[str]:
+        art = session_dir / "artifacts"
+        if not art.exists():
+            return set()
+        return {
+            str(p.relative_to(session_dir).as_posix())
+            for p in art.rglob("*") if p.is_file()
+        }
 
     def start(self, user_id: Optional[str] = None) -> str:
         """Start a long-lived sandbox for this session."""
@@ -63,21 +73,40 @@ class SessionManager:
         self.sessions[session_id] = SessionInfo(container.id, host_port)
         return session_id
 
-    def exec(self, session_id: str, code: str, timeout: int = 30) -> dict:
-        """Execute code inside the existing session; state persists."""
-        self._sweep_idle()
-        info = self.sessions.get(session_id)
+    def exec(self, session_key: str, code: str, timeout: int = 30) -> dict:
+        info = self.sessions.get(session_key)
         if not info:
-            raise RuntimeError("Unknown or expired session_id.")
-
+            raise RuntimeError("Unknown or expired session_key. Call start() first.")
         info.last_used = time.time()
+
+        # Snapshot before
+        before = self._list_artifact_files(info.session_dir)
+
+        # Execute in the long-lived REPL
         with httpx.Client(timeout=timeout + 5) as http:
             r = http.post(
                 f"http://127.0.0.1:{info.host_port}/exec",
                 json={"code": code, "timeout": timeout},
             )
             r.raise_for_status()
-            return r.json()
+            result = r.json()   # {ok, stdout, error?}
+
+        # Snapshot after
+        after = self._list_artifact_files(info.session_dir)
+        new_rel_paths = sorted(after - before)
+
+        # Build container/host map
+        artifact_map = []
+        for rel in new_rel_paths:
+            host_path = (info.session_dir / rel).resolve()
+            # Container path mirrors /session/...
+            ctr_path = f"/session/{rel}"
+            artifact_map.append({"container": ctr_path, "host": str(host_path)})
+
+        # Return enriched result
+        result["artifact_map"] = artifact_map
+        result["session_dir"] = str(info.session_dir)
+        return result
 
     def stop(self, session_id: str) -> None:
         """Stop and remove the session container."""

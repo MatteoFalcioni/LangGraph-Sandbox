@@ -1,10 +1,14 @@
+# sandbox/Dockerfile
 FROM python:3.11-slim
 
+# libs available IN the sandbox (importable by user code)
 RUN pip install --no-cache-dir numpy pandas matplotlib geopandas pyarrow fastapi uvicorn
 
+# non-root user
 RUN useradd -m -u 1000 sandbox
 WORKDIR /app
 
+# REPL server that keeps state in RAM
 COPY src/repl_server.py /app/repl_server.py
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
