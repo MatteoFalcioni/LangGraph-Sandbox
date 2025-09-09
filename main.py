@@ -3,9 +3,13 @@ from langgraph.checkpoint.memory import InMemorySaver
 from dotenv import load_dotenv
 import uuid
 
+from fastapi import FastAPI
 from src.artifacts.store import ensure_artifact_store
+from src.artifacts.api import router as artifacts_router
 
 if __name__ == "__main__":
+
+    app = FastAPI()
 
     env = load_dotenv()
     if env == True: 
@@ -13,7 +17,9 @@ if __name__ == "__main__":
     else:
         print("No .env file found")
 
-    ensure_artifact_store() # Make sure artifact store is ready
+    ensure_artifact_store() # bootstrap storage
+
+    app.include_router(artifacts_router) # register endpoints
 
     builder = get_builder()
 
