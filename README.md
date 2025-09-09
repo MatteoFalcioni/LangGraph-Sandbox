@@ -1,14 +1,20 @@
 # Docker Sandbox Agent
 
-This project provides a **Docker-based sandbox** for executing Python code inside a LangGraph agentic system. It replaces services like E2B by running ephemeral containers that isolate execution, enforce resource limits, and allow safe interaction with local datasets.
+This project provides a **Docker-based sandbox** for executing Python code inside a LangGraph agentic system. It replaces services like E2B by running containers that isolate execution, enforce resource limits, and allow safe interaction with local datasets.
 
 ## Features
 
+### Modes of execution
+
 * **Ephemeral containers**: each tool call spins up a fresh container, ensuring clean state.
+* **Session-pinned containers**: optionally keep a container alive per conversation. Variables and imports stay in RAM, and files written under `/session` persist across tool calls.
+
+### Capabilities
+
 * **Resource isolation**: configurable CPU, memory, and timeout limits.
 * **Dataset mounting**: host datasets (e.g. `src/llm_data/`) mounted read-only at `/data`.
-* **Persistent session folder**: if enabled, `/session` allows sharing intermediate files across tool calls in the same conversation.
-* **Artifact management**: code can write outputs (`.txt`, `.png`, `.csv`, etc.) to `/work/artifacts`; these are automatically copied out to a persistent host folder (`outputs/<run_id>/`).
+* **Persistent session folder**: per-session directory mounted at `/session`, used for sharing files across runs.
+* **Artifact management**: user code writes to `/session/artifacts/`; new files are automatically detected and mapped.
 * **Artifact mapping**: every run returns a mapping `{container_path → host_path}` so the agent/UI can reference both.
 * **Separate stdout/stderr capture**: logs from the sandbox are returned split into stdout and stderr for easier debugging.
 
@@ -26,7 +32,7 @@ This project provides a **Docker-based sandbox** for executing Python code insid
    pip install -r requirements.txt
    ```
 
-   Required: `docker`, `langgraph`, `langchain-core`, `pydantic`, plus any libs you want inside the sandbox image (e.g. `pandas`, `matplotlib`).
+   Required: `docker`, `httpx`, `langgraph`, `langchain-core`, `pydantic`, plus any libs you want inside the sandbox image (e.g. `pandas`, `matplotlib`).
 
 ## Usage
 
@@ -35,24 +41,34 @@ This project provides a **Docker-based sandbox** for executing Python code insid
   ```bash
   python main.py
   ```
-* The agent can now invoke the `code_sandbox` tool. Example user code inside the sandbox:
 
-  ```python
-  from pathlib import Path
-  Path("artifacts").mkdir(exist_ok=True)
-  Path("artifacts/output.txt").write_text("hello from sandbox")
-  ```
+* The agent can now invoke the `code_sandbox` tool.
+
+### Example inside the sandbox
+
+```python
+from pathlib import Path
+
+# RAM state persists across calls in session-pinned mode
+x = 42
+
+# Write an artifact
+Path("/session/artifacts").mkdir(parents=True, exist_ok=True)
+(Path("/session/artifacts/output.txt")).write_text("hello from sandbox")
+```
+
 * After execution, artifacts are available on the host under:
 
-  ```
-  outputs/<run_id>/output.txt
-  ```
+```
+sessions/<session_id>/artifacts/output.txt
+```
 
 ## Project Structure
 
 ```
 project/
-├── outputs/              # promoted artifacts per run
+├── outputs/              # per-run artifacts (ephemeral mode)
+├── sessions/             # per-session folders (session-pinned mode)
 ├── sandbox/              # Dockerfile for sandbox image
 │   └── Dockerfile
 ├── src/
@@ -60,7 +76,9 @@ project/
 │   ├── __init__.py
 │   ├── make_graph.py     # build LangGraph graph
 │   ├── prompt.py         # system prompt templates
-│   ├── sandbox_runner.py # sandbox execution logic
+│   ├── repl_server.py    # REPL server running inside container
+│   ├── session_manager.py# host-side session lifecycle manager
+│   ├── sandbox_runner.py # legacy ephemeral execution path
 │   └── tools.py          # LangGraph tool wrapper
 ├── .env
 ├── .gitignore
@@ -71,7 +89,8 @@ project/
 ## Notes
 
 * Use `/data` inside sandbox code to read host datasets.
-* Use `/work/artifacts` to write outputs that will be persisted to `outputs/`.
-* Use `/session` if you need to share files across multiple tool calls.
-* Each run gets a unique `run_id` to keep artifacts separated.
+* Use `/session/artifacts` to write outputs that persist and are pulled out.
+* In ephemeral mode, use `/work/artifacts` → artifacts will be promoted under `outputs/<run_id>/`.
+* Each session or run returns an `artifact_map` so the UI can link container paths to host paths.
 * Both **stdout** and **stderr** are captured and returned separately for debugging.
+* Use `reset_sandbox` tool (if enabled) to stop a running session and clean up its container.
