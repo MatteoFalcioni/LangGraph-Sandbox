@@ -4,6 +4,8 @@ from contextlib import redirect_stdout
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+# FastAPI 'bridge' between the host and the Python REPL in the container's memory
+
 app = FastAPI()
 
 # One long-lived namespace => variables persist across calls

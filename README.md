@@ -4,10 +4,9 @@ This project provides a **Docker-based sandbox** for executing Python code insid
 
 ## Features
 
-### Modes of execution
+### Mode of execution
 
-* **Ephemeral containers**: each tool call spins up a fresh container, ensuring clean state.
-* **Session-pinned containers**: optionally keep a container alive per conversation. Variables and imports stay in RAM, and files written under `/session` persist across tool calls.
+**Session-pinned containers**: keep a container alive per conversation. Variables and imports stay in RAM, and files written under `/session` persist across tool calls.
 
 ### Capabilities
 
@@ -21,6 +20,11 @@ This project provides a **Docker-based sandbox** for executing Python code insid
 ## Installation
 
 1. Clone the repository.
+
+   ```bash
+   git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
+   ```
+
 2. Build the sandbox image:
 
    ```bash
@@ -50,7 +54,7 @@ This project provides a **Docker-based sandbox** for executing Python code insid
 from pathlib import Path
 
 # RAM state persists across calls in session-pinned mode
-x = 42
+x = 42   # can use x in later runs
 
 # Write an artifact
 Path("/session/artifacts").mkdir(parents=True, exist_ok=True)
@@ -88,11 +92,3 @@ project/
 ├── README.md
 └── requirements.txt               # host deps: docker, httpx, langgraph, etc.
 ```
-
-## Notes
-
-* Use `/data` inside sandbox code to read host datasets.
-* Use `/session/artifacts` to write outputs that persist and are pulled out.
-* In ephemeral mode, use `/work/artifacts` → artifacts will be promoted under `outputs/<run_id>/`.
-* Each session or run returns an `artifact_map` so the UI can link container paths to host paths.
-* Both **stdout** and **stderr** are captured and returned separately for debugging.
