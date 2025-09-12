@@ -10,6 +10,10 @@ import docker           # Host-side Docker SDK (controls containers)
 import httpx            # Lightweight HTTP client to talk to the in-container REPL
 from pathlib import Path
 
+import io
+import tarfile
+import tempfile
+
 from src.artifacts.ingest import ingest_files
 
 
@@ -28,13 +32,15 @@ class SessionInfo:
     Lightweight record for one live session/container:
     - container_id: the Docker container ID (so we can stop/remove it)
     - host_port: the host port mapped to the in-container REPL (listens on 9000)
-    - session_dir: the host path for this session's bind mount (./sessions/<sid>)
+    - session_dir: the host path for this session's bind mount (./sessions/<sid>). It is None if tmpfs is used.
+    - use_tmpfs: whether the session_dir is a tmpfs 
     - last_used: unix timestamp to support idle eviction
     """
-    def __init__(self, container_id: str, host_port: int, session_dir: Path):
+    def __init__(self, container_id: str, host_port: int, session_dir: Path | None, use_tmpfs: bool):
         self.container_id = container_id
         self.host_port = host_port
-        self.session_dir = session_dir
+        self.session_dir = session_dir          # None when tmpfs is used
+        self.use_tmpfs = use_tmpfs
         self.last_used = time.time()
 
 
@@ -44,7 +50,8 @@ class SessionManager:
       - Start (or reattach to) a long-lived container per session_key.
       - Keep Python state in RAM via the in-container FastAPI REPL (repl_server.py).
       - Mount datasets read-only at /data (if provided).
-      - Mount a per-session read-write dir at /session (./sessions/<sid> on host).
+      - Mount a per-session read-write dir at /session (./sessions/<sid> on host) if not using tmpfs.
+      - Optionally use a tmpfs for /session instead of a host dir (safer, but ephemeral).
       - Execute code by POSTing to /exec on the REPL.
       - Detect new artifacts written under /session/artifacts and return their paths.
       - Clean up idle sessions opportunistically.
@@ -55,7 +62,17 @@ class SessionManager:
         image: str = DEFAULT_IMAGE,
         datasets_path: Optional[Path] = None,
         session_root: Path = Path("sessions"),
+        use_tmpfs: bool = False,
+        tmpfs_size: str = "1g",
     ):
+        """
+        Args:
+            image: Docker image name for the sandbox.
+            datasets_path: Optional host path to mount read-only at /data. (Usually None now.)
+            session_root: Host path for per-session bind mount (unused if use_tmpfs=True).
+            use_tmpfs: If True, mount /session as tmpfs (RAM) inside the container.
+            tmpfs_size: tmpfs size limit (e.g., "1g", "512m"). Only used when use_tmpfs=True.
+        """
         # Create a Docker client bound to the host's Docker daemon.
         self.client = docker.from_env()
         self.image = image
@@ -63,9 +80,13 @@ class SessionManager:
         # Optional datasets root; mounted read-only at /data inside the container.
         self.datasets_path = Path(datasets_path).resolve() if datasets_path else None
 
-        # Where we keep per-session folders on the host.
-        # Each session will have: sessions/<sid>  (bind-mounted to /session)
+        # Where we keep per-session folders on the host **if not using tmpfs**.
+        # Each session will have: sessions/<sid> (bind-mounted to /session)
         self.session_root = Path(session_root).resolve()
+
+        # tmpfs options
+        self.use_tmpfs = use_tmpfs
+        self.tmps_size = tmpfs_size
 
         # In-memory registry: session_key -> SessionInfo
         self.sessions: Dict[str, SessionInfo] = {}
