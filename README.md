@@ -102,6 +102,54 @@ Two independent knobs define runtime behavior:
 
 ---
 
+# Environment configuration
+
+The app reads its configuration from environment variables (no special file required). Defaults target **Mode C**: `SESSION_STORAGE=TMPFS` + `DATASET_ACCESS=API_TMPFS`.
+
+## example.env
+
+```env
+# example.env — rename to .env or pass with --env-file
+
+# --- Core knobs ---
+SESSION_STORAGE=TMPFS        # TMPFS | BIND
+DATASET_ACCESS=API_TMPFS     # API_TMPFS | LOCAL_RO
+
+# --- Host paths ---
+SESSIONS_ROOT=./sessions
+BLOBSTORE_DIR=./blobstore
+ARTIFACTS_DB=./artifacts.db
+
+# Required ONLY if DATASET_ACCESS=LOCAL_RO
+# DATASETS_HOST_RO=./example_llm_data
+
+# --- Docker / runtime ---
+SANDBOX_IMAGE=sandbox:latest
+TMPFS_SIZE_MB=1024
+```
+
+## Variables
+
+* `SESSION_STORAGE`: `TMPFS` (RAM, ephemeral) or `BIND` (host folder `./sessions/<sid>`).
+* `DATASET_ACCESS`: `API_TMPFS` (stage datasets into `/session/data`) or `LOCAL_RO` (mount host datasets at `/data`).
+* `SESSIONS_ROOT`: host dir for sessions (BIND mode & logs). Default `./sessions`.
+* `BLOBSTORE_DIR`: host blob store root. Default `./blobstore`.
+* `ARTIFACTS_DB`: SQLite path for artifact metadata. Default `./artifacts.db`.
+* `DATASETS_HOST_RO`: **required only** when `DATASET_ACCESS=LOCAL_RO` (e.g., `./example_llm_data`).
+* `SANDBOX_IMAGE`: Docker image name/tag. Default `sandbox:latest`.
+* `TMPFS_SIZE_MB`: tmpfs size for `/session` when using TMPFS. Default `1024`.
+
+## Usage
+
+* Shell: `export SESSION_STORAGE=TMPFS` … `python main.py`
+* Docker: `docker run --env-file ./.env your-image`
+* Compose: add `env_file: [.env]` or `environment:` entries.
+
+> Tip: add `.env` / `docker.env` to `.gitignore` if they may contain machine-specific paths or secrets.
+
+
+---
+
 ## Usage
 
 * Run your LangGraph app:
