@@ -1,7 +1,7 @@
 # src/artifacts/reader.py
 """
 Small helpers to read artifacts from the local blobstore by artifact ID.
-Plain English:
+Pipeline:
 - Look up the artifact in SQLite to get its SHA and metadata
 - Resolve the blob path on disk using that SHA
 - Return bytes/text, or (optionally) parse common formats
