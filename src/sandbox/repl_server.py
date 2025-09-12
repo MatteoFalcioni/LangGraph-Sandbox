@@ -11,14 +11,6 @@ app = FastAPI()
 # One long-lived namespace => variables persist across calls
 GLOBAL_NS = {"__name__": "__main__"}
 
-'''
-try:    # Optional: preload common libs
-    import pandas as pd  # noqa
-    import numpy as np   # noqa
-    GLOBAL_NS.update({"pd": pd, "np": np})
-except Exception:
-    pass
-'''
 class ExecRequest(BaseModel):
     code: str
     timeout: int | None = 30  # seconds

@@ -1,20 +1,16 @@
 # tools.py
-import json, os
+import json
 from pydantic import BaseModel, Field, ConfigDict
 from typing_extensions import Annotated
 from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 
-from ..sandbox.session_manager import SessionManager
+from src.sandbox.session_manager import SessionManager
 
 # ---- session manager singleton (host-side) ----
-# Mount datasets (RO) at /data inside the sandbox; keep per-session files in ./sessions/<sid>
-# (state persists in RAM; files persist under /session)
 _manager = SessionManager(
     image="py-sandbox:latest",
-    datasets_path=os.path.abspath("src/llm_data"),
-    session_root="sessions",
 )
 
 def _get_session_key() -> str:
