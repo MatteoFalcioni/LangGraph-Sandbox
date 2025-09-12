@@ -1,38 +1,72 @@
 # Docker Sandbox Agent – Artifact Store Edition
 
-This project provides a **Docker-based sandbox** for executing Python code inside a LangGraph agentic system. It replaces services like E2B by running containers that isolate execution, enforce resource limits, and allow safe interaction with local datasets.
+This project provides a **Docker-based sandbox** for executing Python code inside a LangGraph agentic system.
+It replaces services like E2B by running containers that isolate execution, enforce resource limits, and allow safe interaction with datasets.
 
-In this version, the sandbox not only keeps state across calls, but also persists produced files in a **database-backed artifact store**. Artifacts are deduplicated, assigned stable IDs, and can be downloaded or read later without exposing raw filesystem paths.
+The sandbox keeps Python state across tool calls and persists produced files in a **database-backed artifact store**.
+Artifacts are deduplicated, assigned stable IDs, and can be downloaded or read later without exposing raw filesystem paths.
 
 ---
 
-## Features
+## Execution mode
 
-### Mode of execution
+* **Session-pinned containers**: one container per conversation (session).
 
-**Session-pinned containers**: keep a container alive per conversation. Variables and imports stay in RAM, and files written under `/session` persist across tool calls.
+  * Variables and imports live in RAM.
+  * `/session` is mounted as a **tmpfs** (RAM-backed filesystem) so all datasets + artifacts live only in container memory.
+  * When the container is destroyed, everything inside it is gone.
+  * *Note:* if you prefer the previous implementation with datasets mounted read-only at `/data`, you can still enable it by setting the parameter `datasets_path` to the folder of the data you want to mount read only. 
 
-### Capabilities (previous vs now)
+---
+
+## Datasets
+
+* **Before**: datasets were mounted from host at `/data` (read-only).
+* **Now**: datasets are pulled **on demand** by dedicated tools.
+
+  * When the agent chooses a dataset (`download(ds_id)`), the system stages it inside `/session/data/<id>.parquet`.
+  * A per-session **registry** of dataset IDs is kept.
+  * At each code execution, a pre-exec sync ensures all registered datasets are present in the sandbox.
+  * No disk copies are kept on the host (unless you later enable caching or cloud storage).
+
+---
+
+## Artifacts
+
+* User code writes files under `/session/artifacts/`.
+* After each execution:
+
+  1. Sandbox diffs the artifact folder (before vs after run).
+  2. Any new files are copied **out of the container** (since `/session` is tmpfs).
+  3. Files are **ingested into the artifact store**:
+
+     * Saved in `blobstore/` under SHA-256.
+     * Metadata logged in `artifacts.db`.
+     * Deduplication handled automatically.
+  4. Clean **descriptors** returned with `id`, `name`, `size`, `mime`, `sha256`, `created_at`, `url`.
+
+---
+
+## Capabilities
 
 **Before:**
-- Resource isolation: configurable CPU, memory, and timeout limits.
-- Dataset mounting: host datasets (e.g. `src/llm_data/`) mounted read-only at `/data`.
-- Persistent session folder: per-session directory mounted at `/session`, used for sharing files across runs.
-- Artifact management: user code wrote to `/session/artifacts/`; new files were detected and mapped.
-- Artifact mapping: every run returned a mapping `{container_path → host_path}`.
-- Separate stdout/stderr capture.
 
-**Now (Artifact Store Edition):**
-- ✅ All previous features still apply.
-- ✅ **Artifact ingestion:** after each run, new files under `/session/artifacts/` are automatically:
-  - Hashed (SHA-256) and stored in a **blobstore/** folder.
-  - Indexed in a SQLite database `artifacts.db` with metadata.
-  - Deduplicated (same file only stored once).
-  - Linked to the session/run/tool call.
-  - URL injection into descriptors: tools can directly return ready-to-click download links.
-  - Returned as clean **descriptors** with `id`, `name`, `size`, `mime`, `sha256`, `created_at`, `url`.
-- ✅ **Download API:** FastAPI endpoints to fetch artifacts by ID with short-lived signed tokens.
-- ✅ **Artifact reader:** host-side helpers to load artifacts by ID as bytes, text, or even pandas DataFrames (CSV/Parquet).
+* Resource isolation: CPU, memory, timeout limits.
+* Dataset mounting from host at `/data`.
+* Per-session host folder at `/session`.
+* File mapping returned after each run.
+* Separate stdout/stderr capture.
+
+**Now (Artifact Store Edition + tmpfs):**
+
+* ✅ All resource limits still apply.
+* ✅ Session state in RAM (variables + datasets + artifacts).
+* ✅ **No persistent host session dirs** (tmpfs instead of `./sessions/`).
+* ✅ **On-demand datasets** staged into `/session/data`.
+* ✅ **Artifact ingestion pipeline** with deduplication and DB-backed metadata.
+* ✅ **Download API** with signed URLs.
+* ✅ **Artifact reader** helpers to reload artifacts by ID into Python or pandas.
+
 
 ---
 

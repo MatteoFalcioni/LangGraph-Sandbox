@@ -29,12 +29,15 @@ IDLE_TIMEOUT_SECS = 45 * 60  # 45 minutes (tune to your infra)
 
 class SessionInfo:
     """
-    Lightweight record for one live session/container:
-    - container_id: the Docker container ID (so we can stop/remove it)
-    - host_port: the host port mapped to the in-container REPL (listens on 9000)
-    - session_dir: the host path for this session's bind mount (./sessions/<sid>). It is None if tmpfs is used.
-    - use_tmpfs: whether the session_dir is a tmpfs 
-    - last_used: unix timestamp to support idle eviction
+    Lightweight record for one live session/container.
+
+    Fields:
+    - container_id: Docker container ID for the sandbox.
+    - host_port: host port mapped to the in-container REPL (container 9000/tcp).
+    - session_dir: host path backing the /session bind mount (./sessions/<sid>) when
+    using bind-mount mode; None when /session is tmpfs (RAM-backed).
+    - use_tmpfs: True if /session is mounted as tmpfs (RAM) inside the container.
+    - last_used: unix timestamp, used to evict idle sessions.
     """
     def __init__(self, container_id: str, host_port: int, session_dir: Path | None, use_tmpfs: bool):
         self.container_id = container_id
@@ -46,15 +49,28 @@ class SessionInfo:
 
 class SessionManager:
     """
-    One manager object for all sessions. Responsibilities:
-      - Start (or reattach to) a long-lived container per session_key.
-      - Keep Python state in RAM via the in-container FastAPI REPL (repl_server.py).
-      - Mount datasets read-only at /data (if provided).
-      - Mount a per-session read-write dir at /session (./sessions/<sid> on host) if not using tmpfs.
-      - Optionally use a tmpfs for /session instead of a host dir (safer, but ephemeral).
-      - Execute code by POSTing to /exec on the REPL.
-      - Detect new artifacts written under /session/artifacts and return their paths.
-      - Clean up idle sessions opportunistically.
+    Manage long-lived sandbox containers (one per conversation), with two storage modes
+    for /session and optional legacy dataset mounting:
+
+    - /session storage (choose one):
+    1) tmpfs mode (recommended): /session is RAM-backed inside the container.
+        Datasets and artifacts live only for the container lifetime and never touch
+        host disk. New artifacts created under /session/artifacts are copied out
+        after each run and ingested into the artifact store (blob + DB).
+
+    2) bind-mount mode: /session is backed by ./sessions/<sid> on the host.
+        Useful for local inspection/debugging; artifacts are detected by diffing
+        the host folder and then ingested.
+
+    - Datasets (choose one):
+    A) On-demand fetch (current default): dedicated tools fetch datasets and stage
+        them into /session/data inside the container before code execution.
+
+    B) Legacy mount: optionally mount a host datasets folder read-only at /data.
+
+    The manager starts/reattaches containers, probes the in-container REPL, executes
+    code via HTTP, detects newly created artifacts, and hands those files to the
+    artifact ingestion pipeline for deduplication and durable storage.
     """
 
     def __init__(
@@ -68,11 +84,16 @@ class SessionManager:
         """
         Args:
             image: Docker image name for the sandbox.
-            datasets_path: Optional host path to mount read-only at /data. (Usually None now.)
-            session_root: Host path for per-session bind mount (unused if use_tmpfs=True).
-            use_tmpfs: If True, mount /session as tmpfs (RAM) inside the container.
-            tmpfs_size: tmpfs size limit (e.g., "1g", "512m"). Only used when use_tmpfs=True.
+            datasets_path: Optional host path to mount read-only at /data (legacy dataset
+                delivery; set to None to disable).
+            session_root: Host directory used to create ./sessions/<sid> when using
+                bind-mount mode. Ignored when use_tmpfs=True.
+            use_tmpfs: If True, mount /session as tmpfs (RAM) inside the container
+                (no host session directory; ephemeral by design).
+            tmpfs_size: Soft cap for the /session tmpfs (e.g., "1g", "512m"). Only used
+                when use_tmpfs=True.
         """
+
         # Create a Docker client bound to the host's Docker daemon.
         self.client = docker.from_env()
         self.image = image
@@ -86,16 +107,20 @@ class SessionManager:
 
         # tmpfs options
         self.use_tmpfs = use_tmpfs
-        self.tmps_size = tmpfs_size
+        self.tmpfs_size = tmpfs_size
 
         # In-memory registry: session_key -> SessionInfo
         self.sessions: Dict[str, SessionInfo] = {}
 
     def _sweep_idle(self):
         """
-        Opportunistic garbage collection for idle sessions.
-        Called at the top of start() and exec() to keep the set tidy
-        without a dedicated background thread.
+        Remove containers that have been idle longer than IDLE_TIMEOUT_SECS and drop their
+        SessionInfo entries. Called opportunistically at start() and exec().
+
+        Notes:
+        - In tmpfs mode this also discards any in-memory /session contents (expected).
+        - Best-effort cleanup: if Docker already removed the container, we still clear
+        local bookkeeping.
         """
         now = time.time()
         for sid, info in list(self.sessions.items()):
@@ -110,22 +135,20 @@ class SessionManager:
 
     def start(self, session_key: Optional[str] = None) -> str:
         """
-        Start (or attach to) a container for this session_key.
-
-        session_key:
-          - Use your conversation/thread/user id so each user gets their own sandbox.
-          - If None, we generate a random 'anon-<id>'.
+        Start (or reattach to) the sandbox container for a given session_key.
 
         Behavior:
-          1) Sweep idle sessions.
-          2) If we already know this session, return quickly.
-          3) Reuse an existing container named 'sbox-<sid>' if Docker still has it.
-          4) Else, run a new container:
-             - bind-mount ./sessions/<sid> -> /session (RW)
-             - optional datasets_path -> /data (RO)
-             - expose REPL on a random host port mapped from container 9000
-          5) Probe /health until the REPL is ready.
-          6) Register SessionInfo and return sid.
+        1) Evict idle sessions.
+        2) Reuse the container named 'sbox-<sid>' if it exists; otherwise run a new one.
+        3) Mount /session according to the chosen mode:
+            - use_tmpfs=True  → /session is tmpfs (RAM) with size=tmpfs_size.
+            - use_tmpfs=False → bind mount ./sessions/<sid> → /session (RW).
+        4) Optionally mount datasets_path → /data (RO) if provided (legacy mode).
+        5) Probe the in-container REPL /health until ready.
+        6) Register and return the session_key.
+
+        Returns:
+            The resolved session_key (existing or newly created).
         """
         self._sweep_idle()
 
@@ -136,12 +159,14 @@ class SessionManager:
         # Choose the session id.
         sid = session_key or f"anon-{uuid.uuid4().hex[:8]}"
 
-        # Ensure the host session directory exists (so the bind mount has a target).
-        sess_dir = self.session_root / sid
-        sess_dir.mkdir(parents=True, exist_ok=True)
-
         # Stable container name so we can reattach if it survives our process.
         name = f"sbox-{sid}"
+
+        # Prepare host session directory only when NOT using tmpfs.
+        sess_dir = None
+        if not self.use_tmpfs:
+            sess_dir = (self.session_root / sid).resolve()
+            sess_dir.mkdir(parents=True, exist_ok=True)
 
         # --- Fast path: if Docker still has a container with that name, reuse it.
         try:
@@ -158,12 +183,21 @@ class SessionManager:
             # Not there -> fall through to create a brand new container.
             pass
 
-        # Build volume mapping:
-        #   - ./sessions/<sid>  -> /session (RW)
+        # Build mounts
+        volumes = {}
+        tmpfs = {}
+        if self.use_tmpfs:
+            # /session lives in RAM, limited by tmpfs_size
+            # mode=1777 allows all users inside container to write (like /tmp)
+            tmpfs["/session"] = f"rw,size={self.tmpfs_size},mode=1777"
+        else:
+            # Build volume mapping:
+            #   - ./sessions/<sid>  -> /session (RW)
+            volumes[str(sess_dir)] = {"bind": "/session", "mode": "rw"}
+        
         #   - datasets_path     -> /data (RO)  [optional]
-        volumes = {str(sess_dir): {"bind": "/session", "mode": "rw"}}
         if self.datasets_path and self.datasets_path.exists():
-            volumes[str(self.datasets_path)] = {"bind": "/data", "mode": "ro"}
+                volumes[str(self.datasets_path)] = {"bind": "/data", "mode": "ro"}
 
         # Run the container in detached mode. We do NOT fix the host port:
         # 'ports={"9000/tcp": None}' asks Docker to allocate a random free host port,
@@ -175,6 +209,7 @@ class SessionManager:
             nano_cpus=2_000_000_000,       # ~ 2 vCPU worth of time-slice
             ports={"9000/tcp": None},      # random host port for REPL
             volumes=volumes,               # bind mounts (/session and optional /data)
+            tmpfs=tmpfs or None,  # only pass when non-empty
             name=name,                     # stable name so we can reattach later
         )
         container.reload()
@@ -195,18 +230,35 @@ class SessionManager:
                 time.sleep(0.1)
 
         # Register in-memory and return the key.
-        self.sessions[sid] = SessionInfo(container.id, host_port, sess_dir)
+        self.sessions[sid] = SessionInfo(container.id, host_port, sess_dir, self.use_tmpfs)
         return sid
-
-    def _list_artifact_files(self, session_dir: Path) -> set[str]:
+    
+    def get_session_dir(self, session_key: str) -> Path:
         """
-        Return the set of artifact file paths (relative to session_dir)
-        that currently exist under ./sessions/<sid>/artifacts/** on the host.
+        Return the host directory backing /session (bind-mount mode only).
 
-        Why relative? So we can build both:
-          - container path:  /session/<relative>
-          - host path:       session_dir / <relative>
+        Raises:
+            RuntimeError: if use_tmpfs=True (no host session directory exists) or the
+            session is unknown/expired.
         """
+        info = self.sessions.get(session_key)
+        if not info:
+            raise RuntimeError("Unknown or expired session_key. Call start() first.")
+        if info.use_tmpfs or not info.session_dir:
+            raise RuntimeError("No host session directory when use_tmpfs=True.")
+        return info.session_dir
+
+    def _list_artifact_files_host(self, session_dir: Path) -> set[str]:
+        """
+        [BIND-MOUNT MODE]: list all artifact file paths currently present under
+        ./sessions/<sid>/artifacts/** on the host.
+
+        Returns:
+            A set of POSIX-style relative paths (relative to the session root), so callers
+            can form both container paths (/session/<relative>) and host paths
+            (session_dir / <relative>).
+        """
+
         art = session_dir / "artifacts"
         if not art.exists():
             return set()
@@ -216,28 +268,96 @@ class SessionManager:
             for p in art.rglob("*")
             if p.is_file()
         }
+    
+    def _list_artifact_files_container(self, container) -> set[str]:
+        """
+        [TMPFS MODE]: list artifact files inside the container by running `find` under
+        /sesion/artifacts, and return their relative paths.
+
+        Returns:
+            A set of POSIX-style relative paths (relative to /session), e.g.
+            {"artifacts/run_123/plot.png", ...}.
+
+        Note:
+            The 'base' parameter is unused in the current implementation.
+        """
+
+        cmd = ["bash", "-lc", "set -euo pipefail; if [ -d /session/artifacts ]; then find /session/artifacts -type f -printf '%P\\n'; fi"]
+        rc, out = container.exec_run(cmd, demux=True)
+        if rc != 0:
+            return set()
+        stdout = (out[0] or b"").decode("utf-8", errors="ignore")
+        rels = set()
+        for line in stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            rels.add(f"artifacts/{line}")
+        return rels
+    
+    def _copy_from_container(self, container, container_path: str, dst_dir: Path) -> Path:
+        """
+        [TMPFS MODE]: copy a single file from the container's /session into a temporary
+        host file using Docker's get_archive (tar stream). The host file is then suitable
+        for ingestion into the artifact store.
+
+        Args:
+            container: Docker container object.
+            container_path: Absolute path inside the container (e.g., "/session/artifacts/x.png").
+            dst_dir: (Unused) Intended host directory for the copy; currently the method
+                creates a unique temp directory per file.
+
+        Returns:
+            Path to the temporary host file containing the copied data.
+
+        Notes:
+            The 'dst_dir' argument is currently not used; consider honoring it or removing
+            it from the signature for clarity.
+        """
+        bits, _ = container.get_archive(container_path)
+        bio = io.BytesIO()
+        for chunk in bits:
+            bio.write(chunk)
+        bio.seek(0)
+        with tarfile.open(fileobj=bio, mode="r:*") as tar:
+            member = next((m for m in tar.getmembers() if m.isfile()), None)
+            if member is None:
+                raise RuntimeError(f"No regular file in archive: {container_path}")
+            with tar.extractfile(member) as fsrc:
+                tmpdir = Path(tempfile.mkdtemp(prefix="sbox_art_"))
+                dst = tmpdir / Path(container_path).name
+                with open(dst, "wb") as fdst:
+                    fdst.write(fsrc.read())
+                return dst
 
     def exec(self, session_key: str, code: str, timeout: int = 30) -> dict:
         """
-        Execute Python code inside the long-lived container for session_key.
+        Execute Python code inside the session's container via the in-container REPL.
 
-        Steps:
-          1) Validate session & update last_used (for idle eviction).
-          2) Snapshot the set of artifact files before execution.
-          3) POST the code to the REPL's /exec endpoint.
-          4) Snapshot again after execution and diff to find newly created files.
-          5) Ingest the new files into the artifact store (dedup + metadata).
-          6) Return the REPL result enriched with artifacts (descriptors) and session_dir
+        Flow:
+        1) Validate session and update last_used.
+        2) Snapshot artifact files "before" execution:
+            - tmpfs mode: scan inside container.
+            - bind-mount mode: scan host ./sessions/<sid>/artifacts.
+        3) POST code to /exec on the REPL (imports and variables persist in RAM).
+        4) Snapshot "after" and diff to find newly created artifacts.
+        5) Copy only the new files to the host (tmpfs mode) or read from host
+            (bind-mount mode), then ingest into the artifact store (blob + DB).
+        6) Return the REPL result plus artifact descriptors.
 
-        Returns dict like:
-          {
-            "ok": bool,
-            "stdout": "...",
-            "error": "...",            # present when ok == False
-            "artifact_map": [...],     # only new files from this call
-            "session_dir": "/abs/path/to/sessions/<sid>"
-          }
+        Returns:
+            dict with keys:
+            - ok: bool
+            - stdout: str
+            - error: str (present when ok == False)
+            - artifacts: list[ArtifactDescriptor] (new files ingested this call)
+            - session_dir: "" in tmpfs mode, or absolute host path in bind-mount mode
+
+        Notes:
+            This method does not retain a host-side session folder when use_tmpfs=True;
+            artifacts are exported and persisted via the artifact store only.
         """
+
         info = self.sessions.get(session_key)
         if not info:
             # This is a programmer error in the caller: they must call start() once.
@@ -246,8 +366,13 @@ class SessionManager:
         # Mark as used (keeps it alive).
         info.last_used = time.time()
 
-        # --- Snapshot artifacts BEFORE execution.
-        before = self._list_artifact_files(info.session_dir)
+        container = self.client.containers.get(info.container_id)
+
+        # --- Snapshot BEFORE execution.
+        if info.use_tmpfs:
+            before = self._list_artifact_files_container(container)
+        else:
+            before = self._list_artifact_files_host(info.session_dir)
 
         # --- Execute code by calling the in-container REPL API.
         # The REPL holds a shared GLOBAL_NS dict, so imports and variables persist in RAM.
@@ -260,16 +385,27 @@ class SessionManager:
             result = r.json()                 # {ok, stdout, error?}
 
         # --- Snapshot artifacts AFTER execution and diff to get only new files.
-        after = self._list_artifact_files(info.session_dir)
+        # --- Snapshot AFTER & diff
+        if info.use_tmpfs:
+            after = self._list_artifact_files_container(container)
+        else:
+            after = self._list_artifact_files_host(info.session_dir)
         new_rel_paths = sorted(after - before)
 
-        # --- Build a stable container/host mapping for the caller/UI.
-        # --- Convert relative paths to absolute HOST paths for ingest.
-        new_host_files = [(info.session_dir / rel).resolve() for rel in new_rel_paths]
+        # --- Build host file list for ingest
+        if info.use_tmpfs:
+            # Copy new files out of container to temp files on host
+            host_files = []
+            for rel in new_rel_paths:
+                container_abs = f"/session/{rel}"
+                host_tmp = self._copy_from_container(container, container_abs, Path(tempfile.gettempdir()))
+                host_files.append(host_tmp)
+        else:
+            host_files = [(info.session_dir / rel).resolve() for rel in new_rel_paths]
 
         # --- Ingest into the local artifact store (dedup, metadata, delete staging files).
         descriptors = ingest_files(
-            new_host_files=new_host_files,
+            new_host_files=host_files,
             session_id=session_key,   # reuse your session_key
             run_id=None,              # pass a real run_id if you have it
             tool_call_id=None,        # optional; pass one if you have it
@@ -278,14 +414,20 @@ class SessionManager:
         # Enrich and return the REPL response.
         # Keep legacy keys for one release if you want backward compatibility.
         result["artifacts"] = descriptors          # ✅ new, stable contract
-        result["artifact_map"] = []                # optional: keep empty during transition
-        result["session_dir"] = str(info.session_dir)
+        # In tmpfs mode, there is no persistent host session dir to return
+        result["session_dir"] = "" if info.use_tmpfs else str(info.session_dir)
+
         return result
 
     def stop(self, session_key: str) -> None:
         """
-        Stop and remove the container for session_key and drop it from the registry.
-        No-op if the session doesn't exist (idempotent).
+        Stop and remove the container for the given session_key and drop it from the
+        in-memory registry. Idempotent: no error if the session is unknown.
+
+        Tmpfs mode:
+            All /session contents are lost when the container is removed (expected).
+        Bind-mount mode:
+            The host directory ./sessions/<sid> is left intact.
         """
         info = self.sessions.pop(session_key, None)
         if not info:
