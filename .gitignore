@@ -5,3 +5,4 @@ sessions/
 /blobstore/
 /artifacts.db
 .pytest_cache
+docker.env
