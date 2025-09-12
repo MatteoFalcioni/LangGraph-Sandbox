@@ -4,7 +4,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import InMemorySaver
 from dotenv import load_dotenv
-from .code_exec_tool import code_sandbox
+from .tools.code_exec_tool import code_sandbox
 from .prompt import PROMPT
 
 load_dotenv()
