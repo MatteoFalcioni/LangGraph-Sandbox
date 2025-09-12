@@ -8,26 +8,44 @@ Artifacts are deduplicated, assigned stable IDs, and can be downloaded or read l
 
 ---
 
-## Execution mode
+## Execution Mode
 
 * **Session-pinned containers**: one container per conversation (session).
 
   * Variables and imports live in RAM.
-  * `/session` is mounted as a **tmpfs** (RAM-backed filesystem) so all datasets + artifacts live only in container memory.
-  * When the container is destroyed, everything inside it is gone.
-  * *Note:* if you prefer the previous implementation with datasets mounted read-only at `/data`, you can still enable it by setting the parameter `datasets_path` to the folder of the data you want to mount read only. 
+  * `/session` can be backed by either **tmpfs (RAM)** or a **bind mount** on the host (`./sessions/<sid>`).
+  * When using tmpfs, all data lives in memory and is discarded on container removal.
+  * When using bind mount, a host folder persists session state for local inspection.
+
+---
+
+## Storage & Dataset Modes
+
+Two independent knobs define runtime behavior:
+
+* **SessionStorage**: `BIND` (disk) vs `TMPFS` (RAM)
+* **DatasetAccess**: `LOCAL_RO` (host datasets at `/data`) vs `API_TMPFS` (datasets staged into `/session/data`)
+
+### The Four Paths
+
+| ID    | SessionStorage | DatasetAccess  | Description                                                                 | When to use                                                    |
+| ----- | -------------- | -------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **A** | **BIND**       | **LOCAL\_RO**  | Session on disk (`./sessions/<sid>`), datasets mounted RO at `/data`        | Super local dev, debugging, persistent session files           |
+| **B** | **TMPFS**      | **LOCAL\_RO**  | Session in RAM, datasets from host RO at `/data`                            | Big/static datasets + fast ephemeral scratch; immutable inputs |
+| **C** | **TMPFS**      | **API\_TMPFS** | Fully ephemeral: datasets staged into `/session/data` (RAM), session in RAM | Lightweight, multi-tenant, API-fed demos                       |
+| **D** | **BIND**       | **API\_TMPFS** | Datasets staged into `/session/data`, session on disk                       | Persistent session folder but API-fetched datasets (rare)      |
+
+### Recommended Defaults
+
+* **Production / multi-tenant demos:** **C (TMPFS + API\_TMPFS)**. If datasets are huge & stable, prefer **B**.
+* **Local dev/debug:** **A (BIND + LOCAL\_RO)**.
 
 ---
 
 ## Datasets
 
-* **Before**: datasets were mounted from host at `/data` (read-only).
-* **Now**: datasets are pulled **on demand** by dedicated tools.
-
-  * When the agent chooses a dataset (`download(ds_id)`), the system stages it inside `/session/data/<id>.parquet`.
-  * A per-session **registry** of dataset IDs is kept.
-  * At each code execution, a pre-exec sync ensures all registered datasets are present in the sandbox.
-  * No disk copies are kept on the host (unless you later enable caching or cloud storage).
+* **LOCAL\_RO:** Mount a host datasets directory read-only at `/data`. Good for large/static inputs.
+* **API\_TMPFS:** Fetch datasets on demand into `/session/data/<id>.parquet`. Cleanest for ephemeral runs.
 
 ---
 
@@ -37,42 +55,32 @@ Artifacts are deduplicated, assigned stable IDs, and can be downloaded or read l
 * After each execution:
 
   1. Sandbox diffs the artifact folder (before vs after run).
-  2. Any new files are copied **out of the container** (since `/session` is tmpfs).
-  3. Files are **ingested into the artifact store**:
+  2. Any new files are copied out of the container (if TMPFS) or read from host (if BIND).
+  3. Files are ingested into the artifact store:
 
      * Saved in `blobstore/` under SHA-256.
      * Metadata logged in `artifacts.db`.
      * Deduplication handled automatically.
-  4. Clean **descriptors** returned with `id`, `name`, `size`, `mime`, `sha256`, `created_at`, `url`.
+     * Deleted from `/session/artifacts/`.
+
+  4. Descriptors returned with `id`, `name`, `size`, `mime`, `sha256`, `created_at`, `url`.
 
 ---
 
 ## Capabilities
 
-**Before:**
-
-* Resource isolation: CPU, memory, timeout limits.
-* Dataset mounting from host at `/data`.
-* Per-session host folder at `/session`.
-* File mapping returned after each run.
-* Separate stdout/stderr capture.
-
-**Now (Artifact Store Edition + tmpfs):**
-
-* ✅ All resource limits still apply.
-* ✅ Session state in RAM (variables + datasets + artifacts).
-* ✅ **No persistent host session dirs** (tmpfs instead of `./sessions/`).
-* ✅ **On-demand datasets** staged into `/session/data`.
-* ✅ **Artifact ingestion pipeline** with deduplication and DB-backed metadata.
-* ✅ **Download API** with signed URLs.
-* ✅ **Artifact reader** helpers to reload artifacts by ID into Python or pandas.
-
+* ✅ Resource isolation: CPU, memory, timeout limits.
+* ✅ Session state persisted in RAM (TMPFS) or on disk (BIND).
+* ✅ Dataset access via on-demand API staging or local read-only mount.
+* ✅ Artifact ingestion pipeline with deduplication and DB-backed metadata.
+* ✅ Download API with signed URLs.
+* ✅ Artifact reader helpers to reload artifacts by ID.
 
 ---
 
 ## Installation
 
-1. Clone the repository.
+1. Clone the repository:
 
    ```bash
    git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
@@ -123,7 +131,7 @@ print("Plot saved to /session/artifacts/sin.png")
 ```
 
 * After execution, the file will be ingested into the artifact store.
-* The tool response will include a clean descriptor with an `id` you can use to download or load the file.
+* The tool response will include a descriptor with an `id` you can use to download or load the file.
 
 ---
 
@@ -132,18 +140,18 @@ print("Plot saved to /session/artifacts/sin.png")
 ```
 project/
 ├── Dockerfile                     # sandbox image (repl_server inside)
-├── blobstore/                     # NEW: deduplicated file storage (by hash)
-├── artifacts.db                   # NEW: SQLite DB with artifact metadata
-├── sessions/                      # per-session folders (staging before ingest)
-├── outputs/                       # per-run artifacts (legacy, ephemeral mode)
+├── blobstore/                     # deduplicated file storage (by hash)
+├── artifacts.db                   # SQLite DB with artifact metadata
+├── sessions/                      # per-session folders (if BIND mode)
+├── outputs/                       # legacy per-run artifacts (ephemeral)
 ├── src/
 │   ├── __init__.py
-│   ├── llm_data/                  # datasets mounted RO at /data
+│   ├── llm_data/                  # datasets (if LOCAL_RO)
 │   ├── graph/
 │   │   ├── code_exec_tool.py      # LangGraph tool (calls SessionManager)
 │   │   ├── make_graph.py          # build LangGraph graph
 │   │   └── prompt.py              # system prompts
-│   ├── artifacts/                 # NEW: artifact store modules
+│   ├── artifacts/
 │   │   ├── store.py               # init DB + blobstore
 │   │   ├── ingest.py              # move new files into store
 │   │   ├── tokens.py              # signed tokens for downloads
@@ -153,22 +161,21 @@ project/
 │       ├── repl_server.py         # runs INSIDE container (FastAPI REPL)
 │       └── session_manager.py     # host-side session lifecycle + ingestion
 ├── tests/
-│   ├── test_session.py            # legacy session tests
+│   ├── test_session.py
 │   ├── test_artifact_ingest_smoke.py
 │   ├── test_artifact_download_api.py
 │   └── test_artifact_reader.py
 ├── .env
 ├── .gitignore
-├── main.py                        # app entrypoint (starts LangGraph app)
+├── main.py                        # app entrypoint
 ├── README.md
-└── requirements.txt               # host deps: docker, httpx, langgraph, etc.
-
+└── requirements.txt               # host deps
 ```
 
 ---
 
 ## Next Steps
 
-- Add **quotas and retention policies** (per-session max size, automatic cleanup of old artifacts).
-- Swap SQLite/blobstore to **Postgres + S3/MinIO** for scalability without changing the tool contract.
-- Extend the reader to support **image previews or HTML rendering** for richer UI integrations.
+* Add quotas and retention policies (per-session max size, automatic cleanup).
+* Swap SQLite/blobstore to Postgres + S3/MinIO for scalability.
+* Extend the reader to support image previews or HTML rendering for richer UI integrations.

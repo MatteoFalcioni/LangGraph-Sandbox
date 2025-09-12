@@ -295,32 +295,42 @@ class SessionManager:
 
     def _copy_from_container(self, container, container_path: str, dst_dir: Path) -> Path:
         """
-        [TMPFS MODE] Copy a single file from the container's /session to a host file
-        using Docker's get_archive (tar stream). The host file is then suitable
-        for ingestion into the artifact store.
-
-        Args:
-            container: Docker container object.
-            container_path: Absolute path inside the container (e.g., "/session/artifacts/x.png").
-            dst_dir: Host directory where the file will be written (created if needed).
-
-        Returns:
-            Path to the host file containing the copied data.
+        Robustly copy a single file from the container to the host.
+        Tries get_archive(file) first; if 404, falls back to get_archive(parent_dir)
+        and extracts the member.
         """
-        bits, _ = container.get_archive(container_path)
-        bio = io.BytesIO()
-        for chunk in bits:
-            bio.write(chunk)
-        bio.seek(0)
-        with tarfile.open(fileobj=bio, mode="r:*") as tar:
-            member = next((m for m in tar.getmembers() if m.isfile()), None)
+        import os
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        filename = os.path.basename(container_path)
+        parent = os.path.dirname(container_path)
+
+        def _extract_one(tar, want_name: str, out_path: Path) -> Path:
+            # Try exact match first; else find any regular file with that basename
+            member = tar.getmember(want_name) if want_name in tar.getnames() else None
             if member is None:
-                raise RuntimeError(f"No regular file in archive: {container_path}")
-            dst_dir.mkdir(parents=True, exist_ok=True)
-            dst = dst_dir / Path(container_path).name
-            with tar.extractfile(member) as fsrc, open(dst, "wb") as fdst:
+                # Fallback: find by basename match (handles archives that embed full dirs)
+                for m in tar.getmembers():
+                    if m.isfile() and os.path.basename(m.name) == want_name:
+                        member = m
+                        break
+            if member is None:
+                raise RuntimeError(f"No regular file '{want_name}' in archive for {container_path}")
+            with tar.extractfile(member) as fsrc, open(out_path, "wb") as fdst:
                 fdst.write(fsrc.read())
-            return dst
+            return out_path
+
+        # Attempt 1: get_archive(file)
+        try:
+            bits, _ = container.get_archive(container_path)
+            bio = io.BytesIO(b"".join(bits))
+            with tarfile.open(fileobj=bio, mode="r:*") as tar:
+                return _extract_one(tar, filename, dst_dir / filename)
+        except docker.errors.NotFound:
+            # Attempt 2: get_archive(parent_dir) and extract filename
+            bits, _ = container.get_archive(parent)
+            bio = io.BytesIO(b"".join(bits))
+            with tarfile.open(fileobj=bio, mode="r:*") as tar:
+                return _extract_one(tar, filename, dst_dir / filename)
 
     def exec(self, session_key: str, code: str, timeout: int = 30) -> dict:
         """
