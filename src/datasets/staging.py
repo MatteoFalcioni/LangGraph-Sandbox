@@ -63,11 +63,12 @@ def stage_dataset_into_sandbox(
       {
         "id": ds_id,
         "path_in_container": "<container path to use>",
-        "mode": "<A|B|C|D>",
+        "mode": "<BIND_LOCAL|TMPFS_LOCAL|TMPFS_API|BIND_API>",
         "staged": true|false,   # whether bytes were written by this call
       }
     """
-    # Early exit if cached (by your choice, even if TMPFS got wiped)
+    # Early exit if cached (even if TMPFS got wiped - should not happen since we have a session per convo)
+    # but needs to implement session retrieved in previous convo - then becomes a problem
     if skip_if_cached and is_cached(cfg, session_id, ds_id):
         path = (
             container_staged_path(cfg, ds_id)
