@@ -79,3 +79,10 @@ def add_id(cfg: Config, session_id: str, ds_id: str) -> Path:
         ids.append(ds_id)
         return write_ids(cfg, session_id, ids)
     return cache_file_path(cfg, session_id)
+
+
+def clear_cache(cfg: Config, session_id: str) -> Path:
+    """
+    Clear the cache file by writing an empty list. Returns the cache file path.
+    """
+    return write_ids(cfg, session_id, [])

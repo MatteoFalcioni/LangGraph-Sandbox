@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from src.artifacts.store import ensure_artifact_store
 from src.artifacts.api import router as artifacts_router
 from src.datasets.startup import initialize_local_datasets
+from src.datasets.cache import clear_cache
 from src.config import Config
 from langgraph_app.make_graph import get_builder
 
@@ -48,6 +49,8 @@ if __name__ == "__main__":
         usr_msg = input("User: ")
 
         if "/bye" in usr_msg.lower():
+            # Clear the dataset cache when exiting
+            clear_cache(cfg, convo_id)
             break
 
         result = graph.invoke(

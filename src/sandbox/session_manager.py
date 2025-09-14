@@ -5,7 +5,7 @@
 import time
 import uuid
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import docker            # Host-side Docker SDK (controls containers)
 import httpx             # Lightweight HTTP client to talk to the in-container REPL
@@ -16,6 +16,7 @@ import tarfile
 import tempfile
 
 from src.artifacts.ingest import ingest_files
+from src.sandbox.container_utils import cleanup_sandbox_containers
 
 from enum import Enum
 
@@ -497,3 +498,15 @@ class SessionManager:
             self.client.containers.get(info.container_id).remove(force=True)
         except Exception:
             pass  # Best-effort
+
+    def cleanup_all_containers(self, verbose: bool = True) -> List[str]:
+        """
+        Clean up all sandbox containers to avoid conflicts.
+        
+        Args:
+            verbose: Whether to print cleanup messages
+            
+        Returns:
+            List of container names that were removed
+        """
+        return cleanup_sandbox_containers(verbose=verbose)
