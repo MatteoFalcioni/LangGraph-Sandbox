@@ -1,0 +1,7 @@
+include README.md
+include requirements.txt
+include *.env
+include *.md
+recursive-include usage_examples *.py *.env *.md
+recursive-include tests *.py
+recursive-include example_llm_data *.parquet
