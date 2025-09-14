@@ -47,8 +47,8 @@ def ro_datasets_dir(tmp_path):
 MODES = [
     ("A", SessionStorage.BIND,   DatasetAccess.LOCAL_RO),
     ("B", SessionStorage.TMPFS,  DatasetAccess.LOCAL_RO),
-    ("C", SessionStorage.TMPFS,  DatasetAccess.API_TMPFS),
-    ("D", SessionStorage.BIND,   DatasetAccess.API_TMPFS),
+    ("C", SessionStorage.TMPFS,  DatasetAccess.API),
+    ("D", SessionStorage.BIND,   DatasetAccess.API),
 ]
 
 @pytest.mark.parametrize("label, sess_store, data_access", MODES)
@@ -76,7 +76,7 @@ def test_modes_end_to_end(label, sess_store, data_access, ro_datasets_dir):
         out = mgr.exec(sid, "import os; print(os.path.exists('/data/dummy.txt'))")
         assert "True" in out["stdout"], f"{label}: /data/dummy.txt should exist"
     else:
-        # API_TMPFS: typically staged to /session/data by your pipeline; simulate presence
+        # API: typically staged to /session/data by your pipeline; simulate presence
         mgr.exec(sid, "import os, pathlib; pathlib.Path('/session/data').mkdir(parents=True, exist_ok=True); open('/session/data/sim.dat','w').write('x')")
         out = mgr.exec(sid, "import os; print(os.path.exists('/session/data/sim.dat'))")
         assert "True" in out["stdout"], f"{label}: /session/data/sim.dat should exist"
@@ -112,7 +112,7 @@ print("artifact done")
 def test_idle_sweep(tmp_path, ro_datasets_dir, monkeypatch):
     mgr = SessionManager(
         session_storage=SessionStorage.TMPFS,
-        dataset_access=DatasetAccess.API_TMPFS,
+        dataset_access=DatasetAccess.API,
         tmpfs_size="256m",
     )
     sid = mgr.start()

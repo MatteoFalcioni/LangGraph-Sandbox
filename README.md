@@ -22,7 +22,7 @@ The sandbox keeps Python state across tool calls and persists produced files in 
 Two independent knobs define runtime behavior:
 
 * **SessionStorage**: `BIND` (disk) vs `TMPFS` (RAM)
-* **DatasetAccess**: `NONE` (no datasets) vs `LOCAL_RO` (host datasets at `/data`) vs `API_TMPFS` (datasets staged into `/session/data`)
+* **DatasetAccess**: `NONE` (no datasets) vs `LOCAL_RO` (host datasets at `/data`) vs `API` (datasets staged into `/session/data`)
 
 ### The Six Modes
 
@@ -32,8 +32,8 @@ Two independent knobs define runtime behavior:
 | **BIND_NONE** | **BIND**       | **NONE**       | Simple sandbox on disk, no datasets                                        | Persistent code execution, debugging without data              |
 | **TMPFS_LOCAL** | **TMPFS**      | **LOCAL\_RO**  | Session in RAM, datasets from host RO at `/data`                            | Big/static datasets + fast ephemeral scratch; immutable inputs |
 | **BIND_LOCAL** | **BIND**       | **LOCAL\_RO**  | Session on disk (`./sessions/<sid>`), datasets mounted RO at `/data`        | Super local dev, debugging, persistent session files           |
-| **TMPFS_API** | **TMPFS**      | **API\_TMPFS** | Fully ephemeral: datasets staged into `/session/data` (RAM), session in RAM | Lightweight, multi‑tenant, API‑fed demos (default)            |
-| **BIND_API** | **BIND**       | **API\_TMPFS** | Datasets staged into `/session/data`, session on disk                       | Persistent session folder but API‑fetched datasets (rare)      |
+| **TMPFS_API** | **TMPFS**      | **API** | Fully ephemeral: datasets staged into `/session/data` (RAM), session in RAM | Lightweight, multi‑tenant, API‑fed demos (default)            |
+| **BIND_API** | **BIND**       | **API** | Datasets staged into `/session/data`, session on disk                       | Persistent session folder but API‑fetched datasets (rare)      |
 
 ### Recommended Defaults
 
@@ -108,7 +108,7 @@ ARTIFACTS_TOKEN_TTL_SECONDS=600
 
 * ✅ **Resource isolation**: CPU, memory, timeout limits
 * ✅ **Session state persistence**: RAM (TMPFS) or disk (BIND)
-* ✅ **Multiple dataset modes**: NONE, LOCAL_RO (read-only mount), API_TMPFS (on-demand staging)
+* ✅ **Multiple dataset modes**: NONE, LOCAL_RO (read-only mount), API (on-demand staging)
 * ✅ **Artifact pipeline**: deduplication, DB metadata, signed download URLs
 * ✅ **Simple mode**: NONE mode for general-purpose code execution without datasets
 
@@ -133,7 +133,7 @@ ARTIFACTS_TOKEN_TTL_SECONDS=600
 
 ## Environment configuration
 
-The app reads its configuration from environment variables (no special file required). Defaults target **TMPFS_API**: `SESSION_STORAGE=TMPFS` + `DATASET_ACCESS=API_TMPFS`.
+The app reads its configuration from environment variables (no special file required). Defaults target **TMPFS_API**: `SESSION_STORAGE=TMPFS` + `DATASET_ACCESS=API`.
 
 ### example.env
 
@@ -142,7 +142,7 @@ The app reads its configuration from environment variables (no special file requ
 
 # --- Core knobs ---
 SESSION_STORAGE=TMPFS        # TMPFS | BIND
-DATASET_ACCESS=API_TMPFS     # NONE | LOCAL_RO | API_TMPFS
+DATASET_ACCESS=API     # NONE | LOCAL_RO | API
 
 # --- Host paths ---
 SESSIONS_ROOT=./sessions
@@ -179,14 +179,14 @@ DATASETS_HOST_RO=./example_llm_data
 **Production API-fed demos (default):**
 ```env
 SESSION_STORAGE=TMPFS
-DATASET_ACCESS=API_TMPFS
+DATASET_ACCESS=API
 ```
 
 ### Variables
 
 **Core Configuration:**
 * `SESSION_STORAGE`: `TMPFS` (RAM, ephemeral) or `BIND` (host folder `./sessions/<sid>`).
-* `DATASET_ACCESS`: `NONE` (no datasets), `LOCAL_RO` (mount host datasets at `/data`), or `API_TMPFS` (stage datasets into `/session/data`).
+* `DATASET_ACCESS`: `NONE` (no datasets), `LOCAL_RO` (mount host datasets at `/data`), or `API` (stage datasets into `/session/data`).
 
 **Paths:**
 * `SESSIONS_ROOT`: host dir for sessions (BIND mode & logs). Default `./sessions`.
@@ -256,7 +256,7 @@ Unit tests cover config, I/O helpers, dataset cache, staging, and end-to-end int
 |----------|------|----------------------|
 | **Simple coding, algorithms** | `TMPFS_NONE` | `DATASET_ACCESS=NONE` |
 | **Local dev with datasets** | `BIND_LOCAL` | `SESSION_STORAGE=BIND` + `DATASET_ACCESS=LOCAL_RO` |
-| **Production API demos** | `TMPFS_API` | `DATASET_ACCESS=API_TMPFS` (default) |
+| **Production API demos** | `TMPFS_API` | `DATASET_ACCESS=API` (default) |
 
 ```bash
 # Simple execution

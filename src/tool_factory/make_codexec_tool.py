@@ -36,7 +36,7 @@ def make_code_sandbox_tool(
     """
     Factory that returns a LangChain Tool for executing code inside the sandbox,
     with optional per-run dataset sync. The provided `fetch_fn` is used when
-    datasets must be staged via API_TMPFS.
+    datasets must be staged via API.
 
     Usage:
         CFG = Config.from_env()
@@ -73,11 +73,11 @@ def make_code_sandbox_tool(
         # Initialize resolved datasets list
         resolved = []
         
-        # Only sync datasets in API mode (when using API_TMPFS dataset access)
+        # Only sync datasets in API mode (when using API dataset access)
         if cfg.uses_api_staging:
             # raise an error if fetch_fn is not provided
             if fetch_fn is None:
-                raise ValueError("fetch_fn must be provided when using API_TMPFS dataset access")
+                raise ValueError("fetch_fn must be provided when using API dataset access")
 
             # Read dataset IDs from session cache (created by select_datasets tool)
             datasets = read_ids(cfg, sid)

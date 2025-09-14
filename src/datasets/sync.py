@@ -39,7 +39,7 @@ def sync_datasets(
 
     for ds_id in ds_ids:
 
-        # API_TMPFS
+        # API
         target_in_container = container_staged_path(cfg, ds_id)
 
         # check if the dataset already exists in the container

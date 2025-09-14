@@ -19,7 +19,7 @@ def _atomic_write_bytes(path: Path, data: bytes) -> None:
 def container_staged_path(cfg: Config, ds_id: str) -> str:
     """
     Return the expected in-container path for a dataset id when staged.
-    (Used for API_TMPFS mode.)
+    (Used for API mode.)
     """
     return f"{cfg.container_data_staged}/{ds_id}.parquet"
 
@@ -44,14 +44,14 @@ def stage_dataset_into_sandbox(
     *,
     cfg: Config,
     session_id: str,
-    container,               # docker container handle (only needed for TMPFS+API_TMPFS)
+    container,               # docker container handle (only needed for TMPFS+API)
     ds_id: str,
     skip_if_cached: bool = True,
     fetch_fn = fetch_dataset,
 ) -> Dict[str, Optional[str]]:
     """
     Stage a dataset into the sandbox according to current mode.
-    - If DATASET_ACCESS=API_TMPFS:
+    - If DATASET_ACCESS=API:
         - TMPFS: push bytes into container:/session/data/<id>.parquet
         - BIND:  write bytes to host ./sessions/<sid>/data/<id>.parquet (bind mount)
     - If DATASET_ACCESS=LOCAL_RO:

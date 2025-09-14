@@ -32,10 +32,10 @@ def _clear_env(monkeypatch):
 
 def test_defaults_mode_c(monkeypatch, tmp_path):
     _clear_env(monkeypatch)
-    # run with no env -> defaults: TMPFS + API_TMPFS (Mode C)
+    # run with no env -> defaults: TMPFS + API (Mode C)
     c = Config.from_env()
     assert c.session_storage == SessionStorage.TMPFS
-    assert c.dataset_access == DatasetAccess.API_TMPFS
+    assert c.dataset_access == DatasetAccess.API
     assert c.mode_id() == "C"
     assert c.tmpfs_size_mb == 1024
     # Paths resolve but need not exist
@@ -68,8 +68,8 @@ def test_bind_local_ro_ok(monkeypatch, tmp_path):
 @pytest.mark.parametrize(
     "sess,dset,expect_mode,needs_ro",
     [
-        ("TMPFS", "API_TMPFS", "C", False),
-        ("BIND",  "API_TMPFS", "D", False),
+        ("TMPFS", "API", "C", False),
+        ("BIND",  "API", "D", False),
         ("TMPFS", "LOCAL_RO",  "B", True),
         ("BIND",  "LOCAL_RO",  "A", True),
     ],
@@ -90,7 +90,7 @@ def test_case_insensitive_env(monkeypatch):
     monkeypatch.setenv("DATASET_ACCESS", "api_tmpfs")
     c = Config.from_env()
     assert c.session_storage == SessionStorage.TMPFS
-    assert c.dataset_access == DatasetAccess.API_TMPFS
+    assert c.dataset_access == DatasetAccess.API
 
 
 def test_overrides(monkeypatch, tmp_path):

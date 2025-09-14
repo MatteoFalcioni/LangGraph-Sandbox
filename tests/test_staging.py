@@ -65,7 +65,7 @@ def _cfg(tmp_path: Path, sess: SessionStorage, dset: DatasetAccess) -> Config:
 # ----- tests -----
 
 def test_api_tmpfs__tmpfs_mode_stages_into_container(tmp_path):
-    cfg = _cfg(tmp_path, SessionStorage.TMPFS, DatasetAccess.API_TMPFS)
+    cfg = _cfg(tmp_path, SessionStorage.TMPFS, DatasetAccess.API)
     sid = "abc"
     c = FakeContainer()
 

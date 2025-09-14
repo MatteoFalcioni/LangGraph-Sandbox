@@ -63,16 +63,16 @@ def make_fake_fetch(counter_list, payload_prefix=b"PARQUET::"):
 def test_integration_tmpfs_api_tmpfs_pipeline(tmp_path: Path):
     """
     End-to-end check:
-      - uses TMPFS + API_TMPFS config
+      - uses TMPFS + API config
       - stages a dataset into the container (tar to /session/data)
       - records dataset in host cache list
       - idempotent: second call with same ds_id does not re-fetch nor re-stage
       - validates tar content matches fake fetch bytes and filename
     """
-    # Config: Mode C (TMPFS + API_TMPFS)
+    # Config: Mode C (TMPFS + API)
     cfg = Config(
         session_storage=SessionStorage.TMPFS,
-        dataset_access=DatasetAccess.API_TMPFS,
+        dataset_access=DatasetAccess.API,
         sessions_root=tmp_path / "sessions",
         blobstore_dir=tmp_path / "blobs",
         artifacts_db_path=tmp_path / "artifacts.sqlite",

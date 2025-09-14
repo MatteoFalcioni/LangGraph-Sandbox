@@ -98,7 +98,7 @@ def get_available_datasets(cfg: Config, session_id: str = "global") -> List[str]
         # For LOCAL_RO, return discovered datasets
         return discover_local_datasets(cfg)
     else:
-        # For API_TMPFS, return cached datasets (populated by select_datasets)
+        # For API, return cached datasets (populated by select_datasets)
         from src.datasets.cache import read_ids
         return read_ids(cfg, session_id)
 

@@ -25,7 +25,7 @@ class SessionStorage(str, Enum):
 
 class DatasetAccess(str, Enum):
     NONE      = "none"        # no datasets - simple sandbox mode
-    API_TMPFS = "api_tmpfs"   # datasets fetched via API into /session/data
+    API = "api"   # datasets fetched via API into /session/data
     LOCAL_RO  = "local_ro"    # host datasets mounted read-only at /data
 
 
@@ -81,7 +81,7 @@ class SessionManager:
          host folder and then ingested.
 
     2) **Dataset access** (how code sees datasets):
-       - DatasetAccess.API_TMPFS (default): your tools fetch datasets and stage them
+       - DatasetAccess.API (default): your tools fetch datasets and stage them
          into /session/data before code execution. No /data mount is used.
        - DatasetAccess.LOCAL_RO: mount a host datasets directory at /data (read-only).
          No API staging is performed.
@@ -95,7 +95,7 @@ class SessionManager:
         self,
         image: str = DEFAULT_IMAGE,
         session_storage: SessionStorage = SessionStorage.TMPFS,
-        dataset_access: DatasetAccess = DatasetAccess.API_TMPFS,
+        dataset_access: DatasetAccess = DatasetAccess.API,
         datasets_path: Optional[Path] = None,
         session_root: Path = Path("sessions"),
         tmpfs_size: str = "1g",
@@ -104,7 +104,7 @@ class SessionManager:
         Args:
             image: Docker image name for the sandbox.
             session_storage: Where /session is backed (TMPFS or BIND).
-            dataset_access: How datasets are exposed (API_TMPFS or LOCAL_RO).
+            dataset_access: How datasets are exposed (API or LOCAL_RO).
             datasets_path: Required when dataset_access=LOCAL_RO; mounted at /data (RO).
             session_root: Base host dir for per-session folders when using BIND.
             tmpfs_size: Soft cap (e.g., "1g", "512m") for /session when using TMPFS.
@@ -120,7 +120,7 @@ class SessionManager:
                 raise ValueError("datasets_path is required when dataset_access=LOCAL_RO")
             self.datasets_path = Path(datasets_path).resolve()
         else:
-            # NONE or API_TMPFS -> Do not mount /data
+            # NONE or API -> Do not mount /data
             self.datasets_path = None
 
         self.session_root = Path(session_root).resolve()
@@ -206,7 +206,7 @@ class SessionManager:
         # /data (datasets) only if LOCAL_RO
         if self.dataset_access == DatasetAccess.LOCAL_RO:
             volumes[str(self.datasets_path)] = {"bind": "/data", "mode": "ro"}
-        # NONE and API_TMPFS modes don't mount /data
+        # NONE and API modes don't mount /data
 
         # Run container (random host port for REPL)
         container = self.client.containers.run(

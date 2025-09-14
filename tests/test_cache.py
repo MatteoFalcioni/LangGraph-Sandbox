@@ -17,7 +17,7 @@ from src.datasets.cache import (
 def _cfg(tmp_path: Path) -> Config:
     return Config(
         session_storage=SessionStorage.TMPFS,
-        dataset_access=DatasetAccess.API_TMPFS,
+        dataset_access=DatasetAccess.API,
         sessions_root=tmp_path / "sessions",
         blobstore_dir=tmp_path / "blobs",
         artifacts_db_path=tmp_path / "artifacts.sqlite",

@@ -18,14 +18,14 @@ class DatasetAccess(str, Enum):
     """How datasets are made available inside the sandbox."""
     NONE      = "NONE"       # no datasets - simple sandbox mode
     LOCAL_RO  = "LOCAL_RO"   # host datasets mounted read-only at /data
-    API_TMPFS = "API_TMPFS"  # datasets fetched on demand into /session/data
+    API = "API"  # datasets fetched on demand into /session/data
 
 
 @dataclass(frozen=True)
 class Config:
     # --- core knobs (defaults are recommended prod/demo) ---
     session_storage: SessionStorage = SessionStorage.TMPFS
-    dataset_access:  DatasetAccess  = DatasetAccess.API_TMPFS
+    dataset_access:  DatasetAccess  = DatasetAccess.API
 
     # --- paths (host-side) ---
     sessions_root: Path = Path("./sessions")      # for BIND mode and saving logs/registry
@@ -39,7 +39,7 @@ class Config:
 
     # --- in-container canonical paths (do not change lightly) ---
     container_session_path: str = "/session"
-    container_data_staged: str  = "/session/data"  # for API_TMPFS
+    container_data_staged: str  = "/session/data"  # for API
     container_data_ro: str      = "/data"          # for LOCAL_RO
 
     # ---------- helpers ----------
@@ -54,7 +54,7 @@ class Config:
 
     @property
     def uses_api_staging(self) -> bool:
-        return self.dataset_access == DatasetAccess.API_TMPFS
+        return self.dataset_access == DatasetAccess.API
 
     @property
     def uses_local_ro(self) -> bool:
@@ -71,8 +71,8 @@ class Config:
           TMPFS_NONE: TMPFS + NONE
           BIND_LOCAL: BIND + LOCAL_RO
           TMPFS_LOCAL: TMPFS + LOCAL_RO
-          TMPFS_API: TMPFS + API_TMPFS (default)
-          BIND_API: BIND + API_TMPFS
+          TMPFS_API: TMPFS + API (default)
+          BIND_API: BIND + API
         """
         if self.is_bind and self.uses_no_datasets:
             return "BIND_NONE"  # "A"
@@ -108,7 +108,7 @@ class Config:
         """
         Environment variables:
           - SESSION_STORAGE = TMPFS | BIND           (default: TMPFS)
-          - DATASET_ACCESS  = NONE | LOCAL_RO | API_TMPFS   (default: API_TMPFS)
+          - DATASET_ACCESS  = NONE | LOCAL_RO | API   (default: API)
           - SESSIONS_ROOT   = ./sessions
           - DATASETS_HOST_RO= ./example_llm_data     (required if LOCAL_RO)
           - BLOBSTORE_DIR   = ./blobstore
@@ -117,7 +117,7 @@ class Config:
           - TMPFS_SIZE_MB   = 1024
         """
         session_storage = cls._get_env_enum("SESSION_STORAGE", SessionStorage, SessionStorage.TMPFS)
-        dataset_access  = cls._get_env_enum("DATASET_ACCESS",  DatasetAccess,  DatasetAccess.API_TMPFS)
+        dataset_access  = cls._get_env_enum("DATASET_ACCESS",  DatasetAccess,  DatasetAccess.API)
 
         sessions_root   = Path(os.getenv("SESSIONS_ROOT", "./sessions")).resolve()
         datasets_host_ro_env = os.getenv("DATASETS_HOST_RO", None)

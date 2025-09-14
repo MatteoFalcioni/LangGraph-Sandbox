@@ -7,7 +7,7 @@ def select_datasets(cfg: Config, session_id: str) -> list[str]:
     """
     Fake implementation of a selector tool that allows the agent to select datasets to sync.
     Selected datasets are written to the session cache using the unified cache system.
-    Implement your own for API_TMPFS mode.
+    Implement your own for API mode.
     
     Args:
         cfg: Configuration object
