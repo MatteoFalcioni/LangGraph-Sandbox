@@ -87,42 +87,47 @@ Two independent knobs define runtime behavior:
      * Removed from `/session/artifacts/` after ingestion.
   4. Descriptors returned with `id`, `name`, `size`, `mime`, `sha256`, `created_at`, `url`.
 
+### Artifact Environment Variables
+
+The artifact system requires these environment variables for secure download URLs:
+
+* `ARTIFACTS_TOKEN_SECRET`: Long random string for signing download tokens (required)
+* `ARTIFACTS_PUBLIC_BASE_URL`: Base URL for artifact downloads (required)
+* `ARTIFACTS_TOKEN_TTL_SECONDS`: Token expiration time in seconds (optional, default: 600)
+
+```env
+# Artifact security
+ARTIFACTS_TOKEN_SECRET=sk-tk123456789098765432112345678900000001111
+ARTIFACTS_PUBLIC_BASE_URL=http://localhost:8000
+ARTIFACTS_TOKEN_TTL_SECONDS=600
+```
+
 ---
 
 ## Capabilities
 
 * ✅ **Resource isolation**: CPU, memory, timeout limits
 * ✅ **Session state persistence**: RAM (TMPFS) or disk (BIND)
-* ✅ **Multiple dataset modes**: NONE (no datasets), LOCAL_RO (read-only mount), API_TMPFS (on-demand staging)
-* ✅ **Artifact ingestion pipeline**: deduplication and DB-backed metadata
-* ✅ **Download API**: signed URLs for artifact access
-* ✅ **Artifact reader helpers**: reload artifacts by ID
+* ✅ **Multiple dataset modes**: NONE, LOCAL_RO (read-only mount), API_TMPFS (on-demand staging)
+* ✅ **Artifact pipeline**: deduplication, DB metadata, signed download URLs
 * ✅ **Simple mode**: NONE mode for general-purpose code execution without datasets
 
 ---
 
 ## Installation
 
-1. Clone the repository:
-
+1. **Clone and build:**
    ```bash
    git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
    cd LangGraph-Sandbox
-   ```
-
-2. Build the sandbox image (root `Dockerfile`):
-
-   ```bash
    docker build -t py-sandbox:latest -f Dockerfile .
    ```
 
-3. Install Python dependencies (host):
-
+2. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
-
-   Required: `docker`, `httpx`, `langgraph`, `langchain-core`, `pydantic` (plus whatever you bake into the sandbox image, e.g. `pandas`, `matplotlib`).
+   Required: `docker`, `httpx`, `langgraph`, `langchain-core`, `pydantic` (plus sandbox image packages like `pandas`, `matplotlib`).
 
 ---
 
@@ -150,6 +155,11 @@ ARTIFACTS_DB=./artifacts.db
 # --- Docker / runtime ---
 SANDBOX_IMAGE=sandbox:latest
 TMPFS_SIZE_MB=1024
+
+# --- Artifacts service ---
+ARTIFACTS_TOKEN_SECRET=sk-tk123456789098765432112345678900000001111
+ARTIFACTS_PUBLIC_BASE_URL=http://localhost:8000
+ARTIFACTS_TOKEN_TTL_SECONDS=600
 ```
 
 ### Quick Start Examples
@@ -166,7 +176,7 @@ DATASET_ACCESS=LOCAL_RO
 DATASETS_HOST_RO=./example_llm_data
 ```
 
-**Production API-fed demos:**
+**Production API-fed demos (default):**
 ```env
 SESSION_STORAGE=TMPFS
 DATASET_ACCESS=API_TMPFS
@@ -174,14 +184,24 @@ DATASET_ACCESS=API_TMPFS
 
 ### Variables
 
+**Core Configuration:**
 * `SESSION_STORAGE`: `TMPFS` (RAM, ephemeral) or `BIND` (host folder `./sessions/<sid>`).
 * `DATASET_ACCESS`: `NONE` (no datasets), `LOCAL_RO` (mount host datasets at `/data`), or `API_TMPFS` (stage datasets into `/session/data`).
+
+**Paths:**
 * `SESSIONS_ROOT`: host dir for sessions (BIND mode & logs). Default `./sessions`.
 * `BLOBSTORE_DIR`: host blob store root. Default `./blobstore`.
 * `ARTIFACTS_DB`: SQLite path for artifact metadata. Default `./artifacts.db`.
 * `DATASETS_HOST_RO`: **required only** when `DATASET_ACCESS=LOCAL_RO` (e.g., `./example_llm_data`).
+
+**Docker:**
 * `SANDBOX_IMAGE`: Docker image name/tag. Default `sandbox:latest`.
 * `TMPFS_SIZE_MB`: tmpfs size for `/session` when using TMPFS. Default `1024`.
+
+**Artifacts Security:**
+* `ARTIFACTS_TOKEN_SECRET`: Long random string for signing download tokens (**required**).
+* `ARTIFACTS_PUBLIC_BASE_URL`: Base URL for artifact downloads (**required**).
+* `ARTIFACTS_TOKEN_TTL_SECONDS`: Token expiration time in seconds (optional, default: 600).
 
 ### Usage
 
@@ -193,119 +213,28 @@ DATASET_ACCESS=API_TMPFS
 
 ---
 
-## NONE Mode - Simple Code Execution
-
-The **NONE** dataset mode provides a clean, simple code execution environment without any dataset functionality. This is perfect for:
-
-* **General-purpose coding** and algorithm development
-* **Educational demos** that don't require data
-* **Lightweight experimentation** and prototyping
-* **Testing and debugging** without data dependencies
-
-### Using NONE Mode
-
-**Environment variable:**
-```bash
-export DATASET_ACCESS=NONE
-python main.py
-```
-
-**Programmatic:**
-```python
-from src.config import Config, DatasetAccess, SessionStorage
-
-cfg = Config(
-    session_storage=SessionStorage.TMPFS,  # or BIND for persistence
-    dataset_access=DatasetAccess.NONE
-)
-```
-
-### What's Available in NONE Mode
-
-* ✅ **Full Python environment** with all installed packages
-* ✅ **Session persistence** - variables and imports persist across calls
-* ✅ **Artifact creation** - save files to `/session/artifacts/`
-* ✅ **Resource limits** - CPU, memory, and timeout controls
-* ❌ **No datasets** - no `/data` mount or dataset syncing
-* ❌ **No dataset tools** - no dataset selection or staging
-
-### Example Usage
-
-```python
-# This code works in NONE mode
-import math
-import matplotlib.pyplot as plt
-import numpy as np
-
-# Create a plot
-x = np.linspace(0, 2*math.pi, 100)
-y = np.sin(x)
-
-plt.figure(figsize=(10, 6))
-plt.plot(x, y)
-plt.savefig('/session/artifacts/sine_wave.png')
-print("Plot saved!")
-
-# Variables persist across calls
-result = sum(math.sqrt(i) for i in range(1, 101))
-print(f"Sum: {result:.2f}")
-```
-
----
-
 ## Usage
 
 Run your LangGraph app:
-
 ```bash
 python main.py
 ```
 
-The agent can now invoke the code execution tool.
-
-### Example inside the sandbox
-
-```python
-from pathlib import Path
-import matplotlib.pyplot as plt
-import numpy as np
-
-# RAM state persists across calls in session‑pinned mode
-x = np.linspace(-2, 2, 100)
-y = np.sin(x)
-
-# Write an artifact (plot)
-Path("/session/artifacts").mkdir(parents=True, exist_ok=True)
-plt.plot(x, y)
-plt.savefig("/session/artifacts/sin.png")
-print("Plot saved to /session/artifacts/sin.png")
-```
-
-After execution, the file is ingested into the artifact store. The tool response includes a descriptor with an `id` for downloading or re‑loading the file.
+The agent can now invoke the code execution tool. User code writes files to `/session/artifacts/` which are automatically ingested into the artifact store with deduplication and signed download URLs.
 
 ---
 
-## Repository layout & dataset fetching
+## Repository Layout
 
 ```text
 src/
   artifacts/                 # artifact store (blob + DB bindings)
-  datasets/
-    cache.py                 # host-side cache list: ./sessions/<sid>/cache_datasets.txt
-    fetcher.py               # **FAKE** fetcher → replace with real API returning bytes
-    staging.py               # mode-aware staging into the sandbox
-  sandbox/
-    io.py                    # push bytes into container (/session/...)
-    repl_server.py           # in-container REPL
-    session_manager.py       # session lifecycle (TMPFS/BIND, artifacts, etc.)
-  config.py                  # env-driven config (SESSION_STORAGE, DATASET_ACCESS, ...)
+  datasets/                  # dataset staging and caching
+  sandbox/                   # container lifecycle and I/O
+  config.py                  # environment configuration
 
-langgraph_app/
-  code_exec_tool.py          # LangGraph tool that calls the session manager
-  make_graph.py              # graph assembly
-  prompt.py                  # system prompts
-
-sessions/                    # per-session folders (BIND mode & logs)
+langgraph_app/               # LangGraph tools and graph assembly
+sessions/                    # per-session folders (BIND mode)
 blobstore/                   # deduped artifact blobs
 artifacts.db                 # artifact metadata
 ```
@@ -314,35 +243,29 @@ artifacts.db                 # artifact metadata
 
 ## Testing
 
-We ship unit tests for config, I/O helpers, dataset cache, staging, and an end‑to‑end TMPFS + API\_TMPFS integration test with fakes.
-
 ```bash
 pytest -q
 ```
+Unit tests cover config, I/O helpers, dataset cache, staging, and end-to-end integration.
 
 ---
 
 ## Quick Reference
 
-### Mode Selection Guide
-
-| Use Case | Recommended Mode | Environment Variables |
-|----------|------------------|----------------------|
-| **Simple coding, algorithms, demos** | `TMPFS_NONE` | `DATASET_ACCESS=NONE` |
-| **Local development with datasets** | `BIND_LOCAL` | `SESSION_STORAGE=BIND` + `DATASET_ACCESS=LOCAL_RO` |
-| **Production API-fed demos** | `TMPFS_API` | `DATASET_ACCESS=API_TMPFS` (default) |
-| **Persistent coding without data** | `BIND_NONE` | `SESSION_STORAGE=BIND` + `DATASET_ACCESS=NONE` |
-
-### Common Commands
+| Use Case | Mode | Environment Variables |
+|----------|------|----------------------|
+| **Simple coding, algorithms** | `TMPFS_NONE` | `DATASET_ACCESS=NONE` |
+| **Local dev with datasets** | `BIND_LOCAL` | `SESSION_STORAGE=BIND` + `DATASET_ACCESS=LOCAL_RO` |
+| **Production API demos** | `TMPFS_API` | `DATASET_ACCESS=API_TMPFS` (default) |
 
 ```bash
-# Simple code execution (no datasets)
+# Simple execution
 DATASET_ACCESS=NONE python main.py
 
-# Local development with datasets
+# Local development
 SESSION_STORAGE=BIND DATASET_ACCESS=LOCAL_RO DATASETS_HOST_RO=./example_llm_data python main.py
 
-# Production mode (default)
+# Production (default)
 python main.py
 ```
 
@@ -353,4 +276,3 @@ python main.py
 * Add quotas and retention policies (per‑session max size, automatic cleanup).
 * Swap SQLite/blobstore to Postgres + S3/MinIO for scalability.
 * Extend the fetcher to expose integrity/metadata (e.g., return `(bytes, sha256, version)`), then add a host cache by hash for cross‑session reuse.
-* Optional pre‑exec sync for deterministic recovery after tmpfs container restarts.
