@@ -13,7 +13,7 @@ CFG = Config.from_env()
 
 # ---- session manager singleton (host-side) ----
 _manager = SessionManager(
-    image=CFG.sandbox_image,   # was "py-sandbox:latest"
+    image=CFG.sandbox_image,   
 )
 
 def _get_session_key() -> str:

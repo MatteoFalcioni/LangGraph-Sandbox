@@ -32,7 +32,7 @@ class DatasetAccess(str, Enum):
 REPL_PORT = "9000/tcp"
 
 # Default image name for the sandbox container. Build it with your Dockerfile.
-DEFAULT_IMAGE = "py-sandbox:latest"
+DEFAULT_IMAGE = "sandbox:latest"
 
 # If a session hasn't been touched for this many seconds, we consider it idle.
 # We opportunistically sweep (cleanup) in start/exec calls.

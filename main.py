@@ -1,4 +1,3 @@
-from src.graph.make_graph import get_builder
 from langgraph.checkpoint.memory import InMemorySaver
 from dotenv import load_dotenv
 import uuid
@@ -6,6 +5,7 @@ import uuid
 from fastapi import FastAPI
 from src.artifacts.store import ensure_artifact_store
 from src.artifacts.api import router as artifacts_router
+from langgraph_app.make_graph import get_builder
 
 if __name__ == "__main__":
 
