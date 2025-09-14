@@ -29,14 +29,18 @@ def fetch_artifact_urls(session_id: str) -> List[Dict[str, str]]:
     Fetch all artifacts for a given session and return their download URLs.
     Returns a list of dictionaries with artifact info and download URLs.
     """
-    from src.artifacts.store import _resolve_paths
     import sqlite3
+    import os
     
-    paths = _resolve_paths()
+    # Use the fully_local database and blobstore
+    current_dir = Path(__file__).resolve().parent
+    db_path = current_dir / "fully_local.db"
+    blob_dir = current_dir / "fully_local_blobstore"
+    
     artifacts = []
     
     try:
-        with sqlite3.connect(paths["db_path"]) as conn:
+        with sqlite3.connect(db_path) as conn:
             # Get all artifacts linked to this session
             rows = conn.execute("""
                 SELECT a.id, a.filename, a.mime, a.size, a.created_at
