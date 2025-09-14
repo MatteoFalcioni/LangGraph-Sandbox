@@ -20,13 +20,13 @@ from src.artifacts.ingest import ingest_files
 from enum import Enum
 
 class SessionStorage(str, Enum):
-    TMPFS = "tmpfs"   # /session is RAM-backed inside the container
-    BIND  = "bind"    # /session is bind-mounted to ./sessions/<sid> on host
+    TMPFS = "TMPFS"   # /session is RAM-backed inside the container
+    BIND  = "BIND"    # /session is bind-mounted to ./sessions/<sid> on host
 
 class DatasetAccess(str, Enum):
-    NONE      = "none"        # no datasets - simple sandbox mode
-    API = "api"   # datasets fetched via API into /session/data
-    LOCAL_RO  = "local_ro"    # host datasets mounted read-only at /data
+    NONE      = "NONE"        # no datasets - simple sandbox mode
+    API = "API"   # datasets fetched via API into /session/data
+    LOCAL_RO  = "LOCAL_RO"    # host datasets mounted read-only at /data
 
 
 # Docker exposes port mappings as "<container_port>/tcp" in the attrs.
@@ -188,6 +188,10 @@ class SessionManager:
                 existing.start()
             existing.reload()
             host_port = int(existing.attrs["NetworkSettings"]["Ports"][REPL_PORT][0]["HostPort"])
+            # Ensure session_dir is set correctly based on current storage mode
+            if self.session_storage == SessionStorage.BIND:
+                sess_dir = (self.session_root / sid).resolve()
+                sess_dir.mkdir(parents=True, exist_ok=True)
             self.sessions[sid] = SessionInfo(existing.id, host_port, sess_dir, self.session_storage)
             return sid
         except docker.errors.NotFound:
@@ -279,6 +283,8 @@ class SessionManager:
             can form both container paths (/session/<relative>) and host paths
             (session_dir / <relative>).
         """
+        if session_dir is None:
+            return set()
         art = session_dir / "artifacts"
         if not art.exists():
             return set()
@@ -457,6 +463,8 @@ class SessionManager:
                 for rel in new_rel_paths
             ]
         else:
+            if info.session_dir is None:
+                raise RuntimeError("Session directory is None in BIND mode. This should not happen.")
             host_files = [(info.session_dir / rel).resolve() for rel in new_rel_paths]
 
         # Ingest
@@ -469,7 +477,7 @@ class SessionManager:
 
         # Response
         result["artifacts"] = descriptors
-        result["session_dir"] = "" if info.session_storage == SessionStorage.TMPFS else str(info.session_dir)
+        result["session_dir"] = "" if info.session_storage == SessionStorage.TMPFS else str(info.session_dir or "")
         return result
 
     def stop(self, session_key: str) -> None:
