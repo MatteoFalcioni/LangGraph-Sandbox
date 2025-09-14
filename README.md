@@ -28,15 +28,15 @@ Two independent knobs define runtime behavior:
 
 | ID    | SessionStorage | DatasetAccess  | Description                                                                 | When to use                                                    |
 | ----- | -------------- | -------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **A** | **BIND**       | **LOCAL\_RO**  | Session on disk (`./sessions/<sid>`), datasets mounted RO at `/data`        | Super local dev, debugging, persistent session files           |
-| **B** | **TMPFS**      | **LOCAL\_RO**  | Session in RAM, datasets from host RO at `/data`                            | Big/static datasets + fast ephemeral scratch; immutable inputs |
-| **C** | **TMPFS**      | **API\_TMPFS** | Fully ephemeral: datasets staged into `/session/data` (RAM), session in RAM | Lightweight, multi‑tenant, API‑fed demos                       |
-| **D** | **BIND**       | **API\_TMPFS** | Datasets staged into `/session/data`, session on disk                       | Persistent session folder but API‑fetched datasets (rare)      |
+| **BIND_LOCAL** | **BIND**       | **LOCAL\_RO**  | Session on disk (`./sessions/<sid>`), datasets mounted RO at `/data`        | Super local dev, debugging, persistent session files           |
+| **TMPFS_LOCAL** | **TMPFS**      | **LOCAL\_RO**  | Session in RAM, datasets from host RO at `/data`                            | Big/static datasets + fast ephemeral scratch; immutable inputs |
+| **TMPFS_API** | **TMPFS**      | **API\_TMPFS** | Fully ephemeral: datasets staged into `/session/data` (RAM), session in RAM | Lightweight, multi‑tenant, API‑fed demos                       |
+| **BIND_API** | **BIND**       | **API\_TMPFS** | Datasets staged into `/session/data`, session on disk                       | Persistent session folder but API‑fetched datasets (rare)      |
 
 ### Recommended Defaults
 
-* **Production / multi‑tenant demos:** **C (TMPFS + API\_TMPFS)**. If datasets are huge & stable, prefer **B**.
-* **Local dev/debug:** **A (BIND + LOCAL\_RO)**.
+* **Production / multi‑tenant demos:** **TMPFS_API**. If datasets are huge & stable, prefer **TMPFS_LOCAL**.
+* **Local dev/debug:** **BIND + LOCAL\_RO**.
 
 ---
 
