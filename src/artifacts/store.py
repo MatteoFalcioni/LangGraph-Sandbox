@@ -23,10 +23,20 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _resolve_paths() -> Dict[str, Path]:
+def _resolve_paths(custom_db_path: str = None, custom_blob_dir: str = None) -> Dict[str, Path]:
     root = _project_root()
-    db_path = Path(os.getenv("ARTIFACTS_DB_PATH", root / "artifacts.db")).resolve()
-    blob_dir = Path(os.getenv("BLOBSTORE_DIR", root / "blobstore")).resolve()
+    
+    # Priority: custom parameters > environment variables > defaults
+    if custom_db_path:
+        db_path = Path(custom_db_path).resolve()
+    else:
+        db_path = Path(os.getenv("ARTIFACTS_DB_PATH", root / "artifacts.db")).resolve()
+    
+    if custom_blob_dir:
+        blob_dir = Path(custom_blob_dir).resolve()
+    else:
+        blob_dir = Path(os.getenv("BLOBSTORE_DIR", root / "blobstore")).resolve()
+    
     return {"db_path": db_path, "blob_dir": blob_dir}
 
 
@@ -70,14 +80,19 @@ def _create_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def ensure_artifact_store() -> Dict[str, str]:
+def ensure_artifact_store(custom_db_path: str = None, custom_blob_dir: str = None) -> Dict[str, str]:
     """
     Creates (if missing):
       - blob folder
       - SQLite DB with the two tables
+    
+    Args:
+        custom_db_path: Optional custom path for the SQLite database file
+        custom_blob_dir: Optional custom path for the blob store directory
+    
     Returns resolved paths as strings.
     """
-    paths = _resolve_paths()
+    paths = _resolve_paths(custom_db_path, custom_blob_dir)
     paths["blob_dir"].mkdir(parents=True, exist_ok=True)
 
     with _connect(paths["db_path"]) as conn:
