@@ -61,19 +61,19 @@ class Config:
 
     def mode_id(self) -> str:
         """
-        Returns the A/B/C/D identifier from the README table:
-          A: BIND + LOCAL_RO
-          B: TMPFS + LOCAL_RO
-          C: TMPFS + API_TMPFS (default)
-          D: BIND + API_TMPFS
+        Returns the identifier from the README table:
+          BIND_LOCAL: BIND + LOCAL_RO
+          TMPFS_LOCAL: TMPFS + LOCAL_RO
+          TMPFS_API: TMPFS + API_TMPFS (default)
+          BIND_API: BIND + API_TMPFS
         """
         if self.is_bind and self.uses_local_ro:
-            return "A"
+            return "BIND_LOCAL"  # "A"
         if self.is_tmpfs and self.uses_local_ro:
-            return "B"
+            return "TMPFS_LOCAL"  # "B"
         if self.is_tmpfs and self.uses_api_staging:
-            return "C"
-        return "D"  # BIND + API_TMPFS
+            return "TMPFS_API"  # "C"
+        return "BIND_API"  # "D"
 
     def session_dir(self, session_id: str) -> Path:
         """Host-side folder for this session (used in BIND mode and for logs/exports)."""
