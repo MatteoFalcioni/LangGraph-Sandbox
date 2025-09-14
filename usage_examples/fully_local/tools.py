@@ -24,51 +24,9 @@ def set_session_id(session_id: str):
     global _current_session_id
     _current_session_id = session_id
 
-def fetch_artifact_urls(session_id: str) -> List[Dict[str, str]]:
-    """
-    Fetch all artifacts for a given session and return their download URLs.
-    Returns a list of dictionaries with artifact info and download URLs.
-    """
-    import sqlite3
-    import os
-    
-    # Use the fully_local database and blobstore
-    current_dir = Path(__file__).resolve().parent
-    db_path = current_dir / "fully_local.db"
-    blob_dir = current_dir / "fully_local_blobstore"
-    
-    artifacts = []
-    
-    try:
-        with sqlite3.connect(db_path) as conn:
-            # Get all artifacts linked to this session
-            rows = conn.execute("""
-                SELECT a.id, a.filename, a.mime, a.size, a.created_at
-                FROM artifacts a
-                JOIN links l ON a.id = l.artifact_id
-                WHERE l.session_id = ?
-                ORDER BY a.created_at DESC
-            """, (session_id,)).fetchall()
-            
-            for row in rows:
-                artifact_id, filename, mime, size, created_at = row
-                try:
-                    download_url = create_download_url(artifact_id)
-                    artifacts.append({
-                        "id": artifact_id,
-                        "filename": filename or artifact_id,
-                        "mime": mime,
-                        "size": size,
-                        "created_at": created_at,
-                        "download_url": download_url
-                    })
-                except Exception as e:
-                    print(f"Warning: Could not create URL for artifact {artifact_id}: {e}")
-                    
-    except Exception as e:
-        print(f"Error fetching artifacts: {e}")
-    
-    return artifacts
+# Artifact fetching is now handled by the general artifact system
+# Import the function from the general location
+from src.artifacts.reader import fetch_artifact_urls
 
 def extract_artifact_references(text: str) -> List[str]:
     """

@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 import sqlite3
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from .store import _resolve_paths
 
@@ -76,3 +76,48 @@ def load_parquet(artifact_id: str, **pandas_kwargs):
     from io import BytesIO
     data = read_bytes(artifact_id)
     return pd.read_parquet(BytesIO(data), **pandas_kwargs)
+
+def fetch_artifact_urls(session_id: str) -> List[Dict[str, str]]:
+    """
+    Fetch all artifacts for a given session and return their download URLs.
+    Returns a list of dictionaries with artifact info and download URLs.
+    """
+    from .tokens import create_download_url
+    import sqlite3
+    
+    artifacts = []
+    
+    try:
+        # Use the artifact store's path resolution (respects environment variables)
+        paths = _resolve_paths()
+        db_path = paths["db_path"]
+        
+        with sqlite3.connect(db_path) as conn:
+            # Get all artifacts linked to this session
+            rows = conn.execute("""
+                SELECT a.id, a.filename, a.mime, a.size, a.created_at
+                FROM artifacts a
+                JOIN links l ON a.id = l.artifact_id
+                WHERE l.session_id = ?
+                ORDER BY a.created_at DESC
+            """, (session_id,)).fetchall()
+            
+            for row in rows:
+                artifact_id, filename, mime, size, created_at = row
+                try:
+                    download_url = create_download_url(artifact_id)
+                    artifacts.append({
+                        "id": artifact_id,
+                        "filename": filename or artifact_id,
+                        "mime": mime,
+                        "size": size,
+                        "created_at": created_at,
+                        "download_url": download_url
+                    })
+                except Exception as e:
+                    print(f"Warning: Could not create URL for artifact {artifact_id}: {e}")
+                    
+    except Exception as e:
+        print(f"Error fetching artifacts: {e}")
+    
+    return artifacts

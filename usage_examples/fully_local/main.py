@@ -1,9 +1,9 @@
-# Set environment variables to use fully_local database and blobstore
+# Set environment variables to use example1 database and blobstore
 # This must be done before any imports that use the artifact system
 import os
 from pathlib import Path
-os.environ["ARTIFACTS_DB_PATH"] = str(Path("fully_local.db").resolve())
-os.environ["BLOBSTORE_DIR"] = str(Path("fully_local_blobstore").resolve())
+os.environ["ARTIFACTS_DB_PATH"] = str(Path("example1_artifacts.db").resolve())
+os.environ["BLOBSTORE_DIR"] = str(Path("example1_blobstore").resolve())
 
 from langgraph.checkpoint.memory import InMemorySaver
 from dotenv import load_dotenv
@@ -19,7 +19,8 @@ from src.config import Config
 from local_ex_graph import get_builder
 from tools import set_session_id
 from src.sandbox.container_utils import cleanup_sandbox_containers
-from tools import fetch_artifact_urls, extract_artifact_references
+from tools import extract_artifact_references
+from src.artifacts.reader import fetch_artifact_urls
 
 if __name__ == "__main__":
 
@@ -31,10 +32,7 @@ if __name__ == "__main__":
     else:
         print("No .env file found")
     
-    ensure_artifact_store(
-        custom_db_path=Path("fully_local.db"), 
-        custom_blob_dir=Path("fully_local_blobstore")
-        ) # bootstrap storage
+    ensure_artifact_store() # bootstrap storage using environment variables
 
     cfg = Config.from_env(env_file_path=Path("fully_local.env"))
     
@@ -53,87 +51,20 @@ if __name__ == "__main__":
 
     app.include_router(artifacts_router) # register endpoints
 
-    # Start a simple HTTP server for artifacts
-    import http.server
-    import socketserver
+    # Start the FastAPI server for artifacts
+    import uvicorn
     import threading
     import time
-    from urllib.parse import urlparse, parse_qs
-    
-    class ArtifactHandler(http.server.SimpleHTTPRequestHandler):
-        def do_GET(self):
-            if self.path.startswith('/artifacts/'):
-                # Handle artifact download
-                try:
-                    from src.artifacts.tokens import verify_token
-                    from src.artifacts.store import _resolve_paths
-                    import sqlite3
-                    
-                    # Parse the URL
-                    parsed = urlparse(self.path)
-                    artifact_id = parsed.path.split('/')[-1]
-                    query_params = parse_qs(parsed.query)
-                    
-                    if 'token' not in query_params:
-                        self.send_error(400, "Missing token parameter")
-                        return
-                    
-                    token = query_params['token'][0]
-                    
-                    # Verify token
-                    try:
-                        data = verify_token(token)
-                    except RuntimeError as e:
-                        self.send_error(401, str(e))
-                        return
-                    
-                    if data["artifact_id"] != artifact_id:
-                        self.send_error(403, "Token does not match artifact")
-                        return
-                    
-                    # Get artifact from database
-                    paths = _resolve_paths()
-                    with sqlite3.connect(paths["db_path"]) as conn:
-                        row = conn.execute(
-                            "SELECT sha256, mime, filename FROM artifacts WHERE id = ?",
-                            (artifact_id,),
-                        ).fetchone()
-                        if not row:
-                            self.send_error(404, "Artifact not found")
-                            return
-                        sha, mime, filename = row
-                    
-                    # Get blob path
-                    blob_dir = paths["blob_dir"]
-                    blob_path = blob_dir / sha[:2] / sha[2:4] / sha
-                    if not blob_path.exists():
-                        self.send_error(410, "Blob missing")
-                        return
-                    
-                    # Serve the file
-                    self.send_response(200)
-                    self.send_header('Content-Type', mime or 'application/octet-stream')
-                    self.send_header('Content-Disposition', f'attachment; filename="{filename or artifact_id}"')
-                    self.end_headers()
-                    
-                    with open(blob_path, 'rb') as f:
-                        self.wfile.write(f.read())
-                        
-                except Exception as e:
-                    self.send_error(500, str(e))
-            else:
-                self.send_error(404, "Not found")
     
     def run_server():
         try:
-            with socketserver.TCPServer(("", 8000), ArtifactHandler) as httpd:
-                httpd.serve_forever()
+            uvicorn.run(app, host="0.0.0.0", port=8000, log_level="error")
         except Exception as e:
             print(f"Server error: {e}")
     
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
-    time.sleep(1)  # Give the server time to start
+    time.sleep(2)  # Give the server time to start
     print("Artifact server started on http://localhost:8000")
 
     builder = get_builder()
