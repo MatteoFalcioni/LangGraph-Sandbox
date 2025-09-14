@@ -30,13 +30,13 @@ def _clear_env(monkeypatch):
         monkeypatch.delenv(k, raising=False)
 
 
-def test_defaults_mode_c(monkeypatch, tmp_path):
+def test_defaults_mode_tmpfs_api(monkeypatch, tmp_path):
     _clear_env(monkeypatch)
-    # run with no env -> defaults: TMPFS + API (Mode C)
+    # run with no env -> defaults: TMPFS + API (TMPFS_API mode)
     c = Config.from_env()
     assert c.session_storage == SessionStorage.TMPFS
     assert c.dataset_access == DatasetAccess.API
-    assert c.mode_id() == "C"
+    assert c.mode_id() == "TMPFS_API"
     assert c.tmpfs_size_mb == 1024
     # Paths resolve but need not exist
     assert c.sessions_root.name == "sessions"
@@ -60,7 +60,7 @@ def test_bind_local_ro_ok(monkeypatch, tmp_path):
     c = Config.from_env()
     assert c.is_bind
     assert c.uses_local_ro
-    assert c.mode_id() == "A"
+    assert c.mode_id() == "BIND_LOCAL"
     assert c.datasets_host_ro == (tmp_path / "llm_data").resolve()
     assert c.session_dir("abc123") == (tmp_path / "sessions" / "abc123").resolve()
 
@@ -68,10 +68,10 @@ def test_bind_local_ro_ok(monkeypatch, tmp_path):
 @pytest.mark.parametrize(
     "sess,dset,expect_mode,needs_ro",
     [
-        ("TMPFS", "API", "C", False),
-        ("BIND",  "API", "D", False),
-        ("TMPFS", "LOCAL_RO",  "B", True),
-        ("BIND",  "LOCAL_RO",  "A", True),
+        ("TMPFS", "API", "TMPFS_API", False),
+        ("BIND",  "API", "BIND_API", False),
+        ("TMPFS", "LOCAL_RO",  "TMPFS_LOCAL", True),
+        ("BIND",  "LOCAL_RO",  "BIND_LOCAL", True),
     ],
 )
 def test_mode_matrix(monkeypatch, tmp_path, sess, dset, expect_mode, needs_ro):
@@ -87,7 +87,7 @@ def test_mode_matrix(monkeypatch, tmp_path, sess, dset, expect_mode, needs_ro):
 def test_case_insensitive_env(monkeypatch):
     _clear_env(monkeypatch)
     monkeypatch.setenv("SESSION_STORAGE", "tmpfs")
-    monkeypatch.setenv("DATASET_ACCESS", "api_tmpfs")
+    monkeypatch.setenv("DATASET_ACCESS", "api")
     c = Config.from_env()
     assert c.session_storage == SessionStorage.TMPFS
     assert c.dataset_access == DatasetAccess.API

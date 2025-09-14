@@ -43,12 +43,12 @@ def ro_datasets_dir(tmp_path):
     (d / "dummy.txt").write_text("dummy")
     return d
 
-# Parametrize the 4 modes A–D
+# Parametrize the 4 main modes
 MODES = [
-    ("A", SessionStorage.BIND,   DatasetAccess.LOCAL_RO),
-    ("B", SessionStorage.TMPFS,  DatasetAccess.LOCAL_RO),
-    ("C", SessionStorage.TMPFS,  DatasetAccess.API),
-    ("D", SessionStorage.BIND,   DatasetAccess.API),
+    ("BIND_LOCAL", SessionStorage.BIND,   DatasetAccess.LOCAL_RO),
+    ("TMPFS_LOCAL", SessionStorage.TMPFS,  DatasetAccess.LOCAL_RO),
+    ("TMPFS_API", SessionStorage.TMPFS,  DatasetAccess.API),
+    ("BIND_API", SessionStorage.BIND,   DatasetAccess.API),
 ]
 
 @pytest.mark.parametrize("label, sess_store, data_access", MODES)
