@@ -24,6 +24,7 @@ class SessionStorage(str, Enum):
     BIND  = "bind"    # /session is bind-mounted to ./sessions/<sid> on host
 
 class DatasetAccess(str, Enum):
+    NONE      = "none"        # no datasets - simple sandbox mode
     API_TMPFS = "api_tmpfs"   # datasets fetched via API into /session/data
     LOCAL_RO  = "local_ro"    # host datasets mounted read-only at /data
 
@@ -119,7 +120,7 @@ class SessionManager:
                 raise ValueError("datasets_path is required when dataset_access=LOCAL_RO")
             self.datasets_path = Path(datasets_path).resolve()
         else:
-            # API_TMPFS -> Do not mount /data
+            # NONE or API_TMPFS -> Do not mount /data
             self.datasets_path = None
 
         self.session_root = Path(session_root).resolve()
@@ -205,6 +206,7 @@ class SessionManager:
         # /data (datasets) only if LOCAL_RO
         if self.dataset_access == DatasetAccess.LOCAL_RO:
             volumes[str(self.datasets_path)] = {"bind": "/data", "mode": "ro"}
+        # NONE and API_TMPFS modes don't mount /data
 
         # Run container (random host port for REPL)
         container = self.client.containers.run(
@@ -248,6 +250,24 @@ class SessionManager:
         if info.session_storage == SessionStorage.TMPFS or not info.session_dir:
             raise RuntimeError("No host session directory when SessionStorage=TMPFS.")
         return info.session_dir
+
+    def container_for(self, session_key: str):
+        """
+        Return the Docker container object for the given session.
+        
+        Args:
+            session_key: The session identifier
+            
+        Returns:
+            Docker container object
+            
+        Raises:
+            RuntimeError: if session is unknown/expired
+        """
+        info = self.sessions.get(session_key)
+        if not info:
+            raise RuntimeError("Unknown or expired session_key. Call start() first.")
+        return self.client.containers.get(info.container_id)
 
     def _list_artifact_files_host(self, session_dir: Path) -> set[str]:
         """

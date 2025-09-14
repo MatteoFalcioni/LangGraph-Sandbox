@@ -5,6 +5,8 @@ import uuid
 from fastapi import FastAPI
 from src.artifacts.store import ensure_artifact_store
 from src.artifacts.api import router as artifacts_router
+from src.datasets.startup import initialize_local_datasets
+from src.config import Config
 from langgraph_app.make_graph import get_builder
 
 if __name__ == "__main__":
@@ -18,6 +20,10 @@ if __name__ == "__main__":
         print("No .env file found")
 
     ensure_artifact_store() # bootstrap storage
+
+    # Initialize LOCAL_RO datasets if using that mode
+    cfg = Config.from_env()
+    initialize_local_datasets(cfg)
 
     app.include_router(artifacts_router) # register endpoints
 

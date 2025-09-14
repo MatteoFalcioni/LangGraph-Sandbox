@@ -16,6 +16,7 @@ class SessionStorage(str, Enum):
 
 class DatasetAccess(str, Enum):
     """How datasets are made available inside the sandbox."""
+    NONE      = "NONE"       # no datasets - simple sandbox mode
     LOCAL_RO  = "LOCAL_RO"   # host datasets mounted read-only at /data
     API_TMPFS = "API_TMPFS"  # datasets fetched on demand into /session/data
 
@@ -59,21 +60,31 @@ class Config:
     def uses_local_ro(self) -> bool:
         return self.dataset_access == DatasetAccess.LOCAL_RO
 
+    @property
+    def uses_no_datasets(self) -> bool:
+        return self.dataset_access == DatasetAccess.NONE
+
     def mode_id(self) -> str:
         """
         Returns the identifier from the README table:
+          BIND_NONE: BIND + NONE
+          TMPFS_NONE: TMPFS + NONE
           BIND_LOCAL: BIND + LOCAL_RO
           TMPFS_LOCAL: TMPFS + LOCAL_RO
           TMPFS_API: TMPFS + API_TMPFS (default)
           BIND_API: BIND + API_TMPFS
         """
+        if self.is_bind and self.uses_no_datasets:
+            return "BIND_NONE"  # "A"
+        if self.is_tmpfs and self.uses_no_datasets:
+            return "TMPFS_NONE"  # "B"
         if self.is_bind and self.uses_local_ro:
-            return "BIND_LOCAL"  # "A"
+            return "BIND_LOCAL"  # "C"
         if self.is_tmpfs and self.uses_local_ro:
-            return "TMPFS_LOCAL"  # "B"
+            return "TMPFS_LOCAL"  # "D"
         if self.is_tmpfs and self.uses_api_staging:
-            return "TMPFS_API"  # "C"
-        return "BIND_API"  # "D"
+            return "TMPFS_API"  # "E"
+        return "BIND_API"  # "F"
 
     def session_dir(self, session_id: str) -> Path:
         """Host-side folder for this session (used in BIND mode and for logs/exports)."""
@@ -97,7 +108,7 @@ class Config:
         """
         Environment variables:
           - SESSION_STORAGE = TMPFS | BIND           (default: TMPFS)
-          - DATASET_ACCESS  = LOCAL_RO | API_TMPFS   (default: API_TMPFS)
+          - DATASET_ACCESS  = NONE | LOCAL_RO | API_TMPFS   (default: API_TMPFS)
           - SESSIONS_ROOT   = ./sessions
           - DATASETS_HOST_RO= ./example_llm_data     (required if LOCAL_RO)
           - BLOBSTORE_DIR   = ./blobstore
@@ -122,6 +133,9 @@ class Config:
             if not datasets_host_ro:
                 raise ValueError("DATASETS_HOST_RO is required when DATASET_ACCESS=LOCAL_RO")
             # Don't force existence here; create/mount logic can handle it, but warn early if missing.
+        elif dataset_access == DatasetAccess.NONE:
+            # NONE mode doesn't need datasets_host_ro
+            datasets_host_ro = None
         return cls(
             session_storage=session_storage,
             dataset_access=dataset_access,

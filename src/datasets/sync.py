@@ -15,7 +15,6 @@ from src.datasets.staging import (
 from src.datasets.fetcher import fetch_dataset as _default_fetch
 
 
-
 def _container_file_exists(container, abs_path: str) -> bool:
     rc, _ = container.exec_run(
         ["/bin/sh", "-lc", f"test -f {shlex.quote(abs_path)}"]
@@ -34,28 +33,17 @@ def sync_datasets(
     """
     Ensure datasets are usable for this run and return their in-container paths.
     Returns a list of descriptors: {"id", "path_in_container", "mode", "staged"}.
+    Main tool script already checks if the system uses API staging -> no need to check here.
     """
     out: List[Dict[str, str]] = []
 
     for ds_id in ds_ids:
-        if cfg.uses_local_ro:
-            # Nothing to stage; just tell code where to read.
-            out.append({
-                "id": ds_id,
-                "path_in_container": container_ro_path(cfg, ds_id),
-                "mode": cfg.mode_id(),
-                "staged": False,
-            })
-            continue
 
         # API_TMPFS
         target_in_container = container_staged_path(cfg, ds_id)
 
-        need_stage = True
-        if cfg.is_tmpfs:
-            need_stage = not _container_file_exists(container, target_in_container) # already exists in container -> do not stage
-        else:
-            need_stage = not host_bind_data_path(cfg, session_id, ds_id).exists() # already exists on host -> do not stage
+        # check if the dataset already exists in the container
+        need_stage = not _container_file_exists(container, target_in_container) # already exists in container -> do not stage
 
         if need_stage:
             desc = stage_dataset_into_sandbox(

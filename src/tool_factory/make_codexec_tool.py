@@ -13,10 +13,12 @@ from langchain_core.messages import ToolMessage
 from src.config import Config
 from src.sandbox.session_manager import SessionManager
 from src.datasets.sync import sync_datasets
+from src.datasets.cache import read_ids
 
 
 def _default_get_session_key() -> str:
     return "conv"  # TODO: user/thread id
+
 
 def make_code_sandbox_tool(
     *,
@@ -68,28 +70,21 @@ def make_code_sandbox_tool(
         sid = session_key_fn()
         manager.start(sid)
 
-        # how can i inspect if there are any datasets to put in sandbox? 
-        # if tmpfs -> i fetch with the fetcher
-        # if ro, i list the datasets and sync -> actually these can be synced once at the beginning and that's it, they are static!
-        # so i only use fetch_fn and sync behaviour in this tool when the mode is API - dont even care about tmpfs,  it's the
-        # API mode that requires syncing
-
-        # so the idea is, in API mode, at each run we have a list of datasets to load, if any (chosen by the agent at another step)
+        # Initialize resolved datasets list
+        resolved = []
         
-        # also, since we do not want to pass dataset_ids as a parameter, we put a get_datasets function 
-        # the idea is that we'll have another tool (select_datasets) through which the agent can select which datasets to load. 
-        # these get written to a file, and then the sync happens from that file
+        # Only sync datasets in API mode (when using API_TMPFS dataset access)
+        if cfg.uses_api_staging:
+            # raise an error if fetch_fn is not provided
+            if fetch_fn is None:
+                raise ValueError("fetch_fn must be provided when using API_TMPFS dataset access")
 
-        if cfg.uses_api_staging: 
-
-            resolved = []
-            # the user will need to implement this - so basically we shifted the problem to implement another function from the user...
-            # but i guess i cannot do otherwise, unless i want to pass dataset_ids as a parameter to the tool
-            # which is not ideal since the agent would need to call the tool with a list of datasets each time - error prone
-            datasets = get_datasets_to_sync(filename="datasets_to_sync.txt")  # implement this function to read from a file
-
+            # Read dataset IDs from session cache (created by select_datasets tool)
+            datasets = read_ids(cfg, sid)
+            
             if datasets:
-                container = manager.container_for(sid)  # ensure SessionManager exposes this - right now it doesn't
+                # Get container reference and sync datasets
+                container = manager.container_for(sid)
                 resolved = sync_datasets(
                     cfg=cfg,
                     session_id=sid,
@@ -97,6 +92,7 @@ def make_code_sandbox_tool(
                     ds_ids=datasets,
                     fetch_fn=fetch_fn,  
                 )
+        # NONE and LOCAL_RO modes don't need dataset syncing
 
         result = manager.exec(sid, code, timeout=timeout_s)
 
