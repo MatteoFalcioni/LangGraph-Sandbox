@@ -1,6 +1,7 @@
 from langgraph.checkpoint.memory import InMemorySaver
 from dotenv import load_dotenv
 import uuid
+from pathlib import Path
 
 from fastapi import FastAPI
 from src.artifacts.store import ensure_artifact_store
@@ -22,6 +23,9 @@ if __name__ == "__main__":
     ensure_artifact_store() # bootstrap storage
 
     # Initialize LOCAL_RO datasets if using that mode
+    # You can now specify a custom env file path:
+    # cfg = Config.from_env(Path("custom.env"))
+    # Or use the default behavior (system env + .env file via dotenv):
     cfg = Config.from_env()
     initialize_local_datasets(cfg)
 

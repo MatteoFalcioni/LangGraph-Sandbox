@@ -87,20 +87,24 @@ Two independent knobs define runtime behavior:
      * Removed from `/session/artifacts/` after ingestion.
   4. Descriptors returned with `id`, `name`, `size`, `mime`, `sha256`, `created_at`, `url`.
 
-### Artifact Environment Variables
+### Artifact Security
 
-The artifact system requires these environment variables for secure download URLs:
+The artifact system automatically generates secure tokens for download URLs. No manual configuration required!
 
-* `ARTIFACTS_TOKEN_SECRET`: Long random string for signing download tokens (required)
-* `ARTIFACTS_PUBLIC_BASE_URL`: Base URL for artifact downloads (required)
-* `ARTIFACTS_TOKEN_TTL_SECONDS`: Token expiration time in seconds (optional, default: 600)
+**Optional Environment Variables:**
+* `ARTIFACTS_PUBLIC_BASE_URL`: Base URL for artifact downloads (default: `http://localhost:8000`)
+* `ARTIFACTS_TOKEN_TTL_SECONDS`: Token expiration time in seconds (default: 600)
 
 ```env
-# Artifact security
-ARTIFACTS_TOKEN_SECRET=sk-tk123456789098765432112345678900000001111
-ARTIFACTS_PUBLIC_BASE_URL=http://localhost:8000
-ARTIFACTS_TOKEN_TTL_SECONDS=600
+# Optional: Override defaults
+ARTIFACTS_PUBLIC_BASE_URL=http://your-domain.com
+ARTIFACTS_TOKEN_TTL_SECONDS=300
 ```
+
+**Security Features:**
+- ✅ **Auto-generated secrets**: Secure token signing key generated at startup
+- ✅ **Short-lived tokens**: Default 10-minute expiration
+- ✅ **No manual configuration**: Works out of the box
 
 ---
 
@@ -199,9 +203,9 @@ DATASET_ACCESS=API
 * `TMPFS_SIZE_MB`: tmpfs size for `/session` when using TMPFS. Default `1024`.
 
 **Artifacts Security:**
-* `ARTIFACTS_TOKEN_SECRET`: Long random string for signing download tokens (**required**).
-* `ARTIFACTS_PUBLIC_BASE_URL`: Base URL for artifact downloads (**required**).
+* `ARTIFACTS_PUBLIC_BASE_URL`: Base URL for artifact downloads (optional, default: `http://localhost:8000`).
 * `ARTIFACTS_TOKEN_TTL_SECONDS`: Token expiration time in seconds (optional, default: 600).
+* **Note**: Token signing secret is auto-generated at startup for security.
 
 ### Usage
 

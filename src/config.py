@@ -5,7 +5,7 @@ import os
 from enum import Enum
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 
 class SessionStorage(str, Enum):
@@ -93,8 +93,37 @@ class Config:
     # ---------- construction ----------
 
     @staticmethod
-    def _get_env_enum(name: str, enum_cls, default):
-        raw = os.getenv(name, None)
+    def _load_env_file(env_file_path: Optional[Path]) -> Dict[str, str]:
+        """Load environment variables from a file if provided."""
+        if env_file_path is None:
+            return {}
+        
+        env_vars = {}
+        if env_file_path.exists():
+            with open(env_file_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    # Skip empty lines and comments
+                    if not line or line.startswith('#'):
+                        continue
+                    # Parse KEY=VALUE format (handle inline comments)
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        # Remove inline comments (everything after #)
+                        if '#' in value:
+                            value = value.split('#')[0]
+                        env_vars[key.strip()] = value.strip()
+        return env_vars
+
+    @staticmethod
+    def _get_env_enum(name: str, enum_cls, default, env_vars: Optional[Dict[str, str]] = None):
+        # First check file env vars, then system env vars
+        raw = None
+        if env_vars and name in env_vars:
+            raw = env_vars[name]
+        else:
+            raw = os.getenv(name, None)
+        
         if raw is None or raw.strip() == "":
             return default  # use the enum default directly
         try:
@@ -103,9 +132,22 @@ class Config:
             allowed = ", ".join(e.value for e in enum_cls)
             raise ValueError(f"{name} must be one of: {allowed} (got: {raw!r})")
 
+    @staticmethod
+    def _get_env_value(name: str, default: str = None, env_vars: Optional[Dict[str, str]] = None) -> str:
+        """Get environment variable value, checking file first, then system env."""
+        if env_vars and name in env_vars:
+            return env_vars[name]
+        return os.getenv(name, default)
+
     @classmethod
-    def from_env(cls) -> "Config":
+    def from_env(cls, env_file_path: Optional[Path] = None) -> "Config":
         """
+        Load configuration from environment variables, optionally from a file.
+        
+        Args:
+            env_file_path: Optional path to environment file. If provided, variables
+                         from the file take precedence over system environment variables.
+        
         Environment variables:
           - SESSION_STORAGE = TMPFS | BIND           (default: TMPFS)
           - DATASET_ACCESS  = NONE | LOCAL_RO | API   (default: API)
@@ -116,17 +158,20 @@ class Config:
           - SANDBOX_IMAGE   = py-sandbox:latest
           - TMPFS_SIZE_MB   = 1024
         """
-        session_storage = cls._get_env_enum("SESSION_STORAGE", SessionStorage, SessionStorage.TMPFS)
-        dataset_access  = cls._get_env_enum("DATASET_ACCESS",  DatasetAccess,  DatasetAccess.API)
+        # Load environment variables from file if provided
+        env_vars = cls._load_env_file(env_file_path)
+        
+        session_storage = cls._get_env_enum("SESSION_STORAGE", SessionStorage, SessionStorage.TMPFS, env_vars)
+        dataset_access  = cls._get_env_enum("DATASET_ACCESS",  DatasetAccess,  DatasetAccess.API, env_vars)
 
-        sessions_root   = Path(os.getenv("SESSIONS_ROOT", "./sessions")).resolve()
-        datasets_host_ro_env = os.getenv("DATASETS_HOST_RO", None)
+        sessions_root   = Path(cls._get_env_value("SESSIONS_ROOT", "./sessions", env_vars)).resolve()
+        datasets_host_ro_env = cls._get_env_value("DATASETS_HOST_RO", None, env_vars)
         datasets_host_ro = Path(datasets_host_ro_env).resolve() if datasets_host_ro_env else None
 
-        blobstore_dir   = Path(os.getenv("BLOBSTORE_DIR", "./blobstore")).resolve()
-        artifacts_db    = Path(os.getenv("ARTIFACTS_DB", "./artifacts.db")).resolve()
-        sandbox_image   = os.getenv("SANDBOX_IMAGE", "py-sandbox:latest")
-        tmpfs_size_mb   = int(os.getenv("TMPFS_SIZE_MB", "1024"))
+        blobstore_dir   = Path(cls._get_env_value("BLOBSTORE_DIR", "./blobstore", env_vars)).resolve()
+        artifacts_db    = Path(cls._get_env_value("ARTIFACTS_DB", "./artifacts.db", env_vars)).resolve()
+        sandbox_image   = cls._get_env_value("SANDBOX_IMAGE", "py-sandbox:latest", env_vars)
+        tmpfs_size_mb   = int(cls._get_env_value("TMPFS_SIZE_MB", "1024", env_vars))
 
         # Basic validation
         if dataset_access == DatasetAccess.LOCAL_RO:

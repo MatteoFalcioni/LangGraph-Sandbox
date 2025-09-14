@@ -4,16 +4,17 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import InMemorySaver
 from dotenv import load_dotenv
-from .tools.code_exec_tool import code_sandbox
+from .tools.code_exec_tool import code_exec_tool
+
 from .prompt import PROMPT
 
-load_dotenv()
+load_dotenv("fully_local.env")
 
 llm = ChatOpenAI(model="gpt-4.1")
 
 coding_agent = create_react_agent(
     model=llm,
-    tools=[code_sandbox],
+    tools=[code_exec_tool],
     prompt=PROMPT
 )
 

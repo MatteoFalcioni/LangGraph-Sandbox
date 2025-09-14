@@ -1,6 +1,6 @@
 # src/artifacts/tokens.py
 from __future__ import annotations
-import base64, hmac, os, time
+import base64, hmac, os, time, secrets
 from hashlib import sha256
 from typing import Dict
 
@@ -11,11 +11,12 @@ def _b64u_dec(s: str) -> bytes:
     pad = "=" * (-len(s) % 4)
     return base64.urlsafe_b64decode(s + pad)
 
+# Generate a secure secret at module load time
+_SECRET = secrets.token_urlsafe(32).encode("utf-8")
+
 def _secret() -> bytes:
-    key = os.getenv("ARTIFACTS_TOKEN_SECRET", "")
-    if not key:
-        raise RuntimeError("ARTIFACTS_TOKEN_SECRET not set")
-    return key.encode("utf-8")
+    """Get the secret key for token signing. Generated automatically at startup."""
+    return _SECRET
 
 def _ttl() -> int:
     try:
@@ -56,13 +57,10 @@ def create_download_url(artifact_id: str) -> str:
     """
     Build a ready-to-click URL for the artifact:
       {PUBLIC_BASE_URL}/artifacts/{id}?token=...
-    Requires:
-      - ARTIFACTS_PUBLIC_BASE_URL
-      - ARTIFACTS_TOKEN_SECRET
+    
+    Uses ARTIFACTS_PUBLIC_BASE_URL if set, otherwise defaults to localhost:8000
     """
-    base = os.getenv("ARTIFACTS_PUBLIC_BASE_URL")
-    if not base:
-        raise RuntimeError("ARTIFACTS_PUBLIC_BASE_URL not set")
+    base = os.getenv("ARTIFACTS_PUBLIC_BASE_URL", "http://localhost:8000")
     token = create_token(artifact_id)
     base = base.rstrip("/")
     return f"{base}/artifacts/{artifact_id}?token={token}"

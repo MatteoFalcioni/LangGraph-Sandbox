@@ -12,31 +12,43 @@ if str(ROOT) not in sys.path:
 from src.artifacts.tokens import create_token, verify_token, create_download_url
 
 
-def test_artifact_token_secret_required():
-    """Test that ARTIFACTS_TOKEN_SECRET is required for token operations."""
+def test_artifact_token_secret_auto_generated():
+    """Test that token secret is automatically generated and works without env vars."""
     # Clear environment
     if "ARTIFACTS_TOKEN_SECRET" in os.environ:
         del os.environ["ARTIFACTS_TOKEN_SECRET"]
     
-    with pytest.raises(RuntimeError, match="ARTIFACTS_TOKEN_SECRET not set"):
-        create_token("test_artifact")
+    # Should work without any environment variables
+    artifact_id = "test_artifact"
+    token = create_token(artifact_id)
+    assert token is not None
+    assert "." in token  # Should have format: payload.signature
+    
+    # Verify token works
+    result = verify_token(token)
+    assert result["artifact_id"] == artifact_id
 
 
-def test_artifact_public_base_url_required():
-    """Test that ARTIFACTS_PUBLIC_BASE_URL is required for download URLs."""
-    # Set token secret but not base URL
-    os.environ["ARTIFACTS_TOKEN_SECRET"] = "test-secret-key"
+def test_artifact_public_base_url_default():
+    """Test that download URLs work with default base URL."""
+    # Clear environment
     if "ARTIFACTS_PUBLIC_BASE_URL" in os.environ:
         del os.environ["ARTIFACTS_PUBLIC_BASE_URL"]
     
-    with pytest.raises(RuntimeError, match="ARTIFACTS_PUBLIC_BASE_URL not set"):
-        create_download_url("test_artifact")
+    artifact_id = "test_artifact_default"
+    url = create_download_url(artifact_id)
+    
+    # Should use default localhost:8000
+    assert url.startswith("http://localhost:8000/artifacts/")
+    assert artifact_id in url
+    assert "token=" in url
 
 
 def test_artifact_token_creation_and_verification():
-    """Test token creation and verification with proper environment variables."""
-    os.environ["ARTIFACTS_TOKEN_SECRET"] = "test-secret-key-12345"
-    os.environ["ARTIFACTS_PUBLIC_BASE_URL"] = "http://localhost:8000"
+    """Test token creation and verification works without environment variables."""
+    # Clear any existing environment variables
+    if "ARTIFACTS_TOKEN_SECRET" in os.environ:
+        del os.environ["ARTIFACTS_TOKEN_SECRET"]
     
     artifact_id = "test_artifact_123"
     
@@ -53,9 +65,12 @@ def test_artifact_token_creation_and_verification():
 
 
 def test_artifact_download_url_creation():
-    """Test download URL creation with proper environment variables."""
-    os.environ["ARTIFACTS_TOKEN_SECRET"] = "test-secret-key-12345"
-    os.environ["ARTIFACTS_PUBLIC_BASE_URL"] = "http://localhost:8000"
+    """Test download URL creation works without environment variables."""
+    # Clear any existing environment variables
+    if "ARTIFACTS_TOKEN_SECRET" in os.environ:
+        del os.environ["ARTIFACTS_TOKEN_SECRET"]
+    if "ARTIFACTS_PUBLIC_BASE_URL" in os.environ:
+        del os.environ["ARTIFACTS_PUBLIC_BASE_URL"]
     
     artifact_id = "test_artifact_456"
     
@@ -73,7 +88,6 @@ def test_artifact_download_url_creation():
 
 def test_artifact_token_ttl_override():
     """Test that ARTIFACTS_TOKEN_TTL_SECONDS can be overridden."""
-    os.environ["ARTIFACTS_TOKEN_SECRET"] = "test-secret-key-12345"
     os.environ["ARTIFACTS_TOKEN_TTL_SECONDS"] = "300"  # 5 minutes
     
     artifact_id = "test_artifact_ttl"
@@ -89,8 +103,6 @@ def test_artifact_token_ttl_override():
 
 def test_artifact_token_expiration():
     """Test that expired tokens are rejected."""
-    os.environ["ARTIFACTS_TOKEN_SECRET"] = "test-secret-key-12345"
-    
     artifact_id = "test_artifact_expired"
     
     # Create token with past expiration
@@ -105,8 +117,6 @@ def test_artifact_token_expiration():
 
 def test_artifact_token_invalid_format():
     """Test that malformed tokens are rejected."""
-    os.environ["ARTIFACTS_TOKEN_SECRET"] = "test-secret-key-12345"
-    
     # Test various invalid token formats
     invalid_tokens = [
         "invalid",
@@ -123,8 +133,6 @@ def test_artifact_token_invalid_format():
 
 def test_artifact_token_invalid_signature():
     """Test that tokens with invalid signatures are rejected."""
-    os.environ["ARTIFACTS_TOKEN_SECRET"] = "test-secret-key-12345"
-    
     artifact_id = "test_artifact_invalid"
     valid_token = create_token(artifact_id)
     
@@ -138,7 +146,6 @@ def test_artifact_token_invalid_signature():
 
 def test_artifact_download_url_with_trailing_slash():
     """Test that download URL handles base URL with trailing slash correctly."""
-    os.environ["ARTIFACTS_TOKEN_SECRET"] = "test-secret-key-12345"
     os.environ["ARTIFACTS_PUBLIC_BASE_URL"] = "http://localhost:8000/"
     
     artifact_id = "test_artifact_slash"
