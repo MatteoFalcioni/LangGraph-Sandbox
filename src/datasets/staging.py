@@ -40,7 +40,7 @@ def host_bind_data_path(cfg: Config, session_id: str, ds_id: str) -> Path:
     return cfg.session_dir(session_id) / "data" / f"{ds_id}.parquet"
 
 
-def stage_dataset_into_sandbox(
+async def stage_dataset_into_sandbox(
     *,
     cfg: Config,
     session_id: str,
@@ -93,8 +93,6 @@ def stage_dataset_into_sandbox(
         A descriptor dictionary with the following keys:
             - "id": The dataset id (str)
             - "path_in_container": The absolute path to the dataset file inside the container (str)
-            - "mode": A string describing the staging mode (e.g., "TMPFS_API", "BIND_API", "TMPFS_LOCAL", "BIND_LOCAL")
-            - "staged": True if the dataset was copied/staged during this call, False if already present
 
     Notes
     -----
@@ -104,9 +102,7 @@ def stage_dataset_into_sandbox(
     - In LOCAL_RO mode:
         - No fetching or copying is performed. The dataset is assumed to be available in the container's read-only /data mount.
     - The function always updates the host-side cache list with ds_id (idempotent).
-    - If skip_if_cached=True and ds_id is already in cache, the function returns early and does not perform any I/O.
-    - The returned descriptor is suitable for tracking dataset provenance and for downstream use in code execution tools.
-
+    
     Raises
     ------
     Any exceptions raised by fetch_fn or I/O operations will propagate.
@@ -134,25 +130,19 @@ def stage_dataset_into_sandbox(
         return {
             "id": ds_id,
             "path_in_container": path,
-            "mode": cfg.mode_id(),
-            "staged": False,
         }
-
-    staged_now = False
 
     if cfg.uses_api_staging:
         # We actually need the bytes
-        data = fetch_fn(ds_id)
+        data = await fetch_fn(ds_id)
 
         if cfg.is_tmpfs:
             # Write directly into container tmpfs
             put_bytes(container, container_staged_path(cfg, ds_id), data)
-            staged_now = True
         else:
             # BIND: write to host, appears in container
             dest = host_bind_data_path(cfg, session_id, ds_id)
             _atomic_write_bytes(dest, data)
-            staged_now = True
 
         # After successful stage, record in host cache with LOADED status
         from src.datasets.cache import update_entry_status, DatasetStatus
@@ -168,6 +158,4 @@ def stage_dataset_into_sandbox(
     return {
         "id": ds_id,
         "path_in_container": path,
-        "mode": cfg.mode_id(),
-        "staged": staged_now,
     }
