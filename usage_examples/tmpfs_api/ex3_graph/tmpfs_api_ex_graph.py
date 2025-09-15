@@ -18,8 +18,8 @@ coding_agent = create_react_agent(
     prompt=PROMPT
 )
 
-def call_model(state: MessagesState):
-    result = coding_agent.invoke({"messages" : state["messages"]})
+async def call_model(state: MessagesState):
+    result = await coding_agent.ainvoke({"messages" : state["messages"]})
     last = result["messages"][-1]
 
     update = AIMessage(content=last.content)
@@ -37,12 +37,16 @@ def get_builder() -> StateGraph:
 
 
 if __name__ == "__main__":
-
+    import asyncio
+    
     checkpointer = InMemorySaver()
 
     builder = get_builder()
     graph = builder.compile(checkpointer=checkpointer)
     
-    init = {"messages": [HumanMessage(content="Hello, Write python code to compute sin(pi/4)")]}
-    out = graph.invoke(init, config={"configurable" : {"thread_id": 1}})
-    print(out["messages"][-1].content)
+    async def test():
+        init = {"messages": [HumanMessage(content="Hello, Write python code to compute sin(pi/4)")]}
+        out = await graph.ainvoke(init, config={"configurable" : {"thread_id": 1}})
+        print(out["messages"][-1].content)
+    
+    asyncio.run(test())

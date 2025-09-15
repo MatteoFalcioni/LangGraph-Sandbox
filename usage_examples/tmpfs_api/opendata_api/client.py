@@ -13,13 +13,21 @@ class BolognaOpenData:
             timeout: request timeout in seconds (default 20.0).
         """
         self._client = httpx.AsyncClient(base_url=BASE_URL, timeout=timeout)
+        self._closed = False
 
     async def close(self):
         """
         Close the underlying HTTP client.
         Must be called at the end of usage to free sockets.
         """
-        await self._client.aclose()
+        if not self._closed:
+            try:
+                await self._client.aclose()
+            except Exception:
+                # Ignore errors when closing - the client might already be closed
+                pass
+            finally:
+                self._closed = True
 
     async def list_datasets(
         self,

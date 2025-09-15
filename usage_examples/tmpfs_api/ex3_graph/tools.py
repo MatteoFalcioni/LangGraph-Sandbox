@@ -47,7 +47,7 @@ def extract_artifact_references(text: str) -> List[str]:
 client = BolognaOpenData()  # close it in main then
 
 @tool(
-    name="list_catalog",
+    name_or_callable="list_catalog",
     description="Search the dataset catalog with a keyword."
 )
 async def list_catalog_tool(
@@ -66,33 +66,87 @@ async def list_catalog_tool(
         }
     )
 
-# the following function does not really load into sandbox: it lets the agent select datasets,
-# which are written into cache by this tool.
-# Then when we run the code executor tool it automatically syncs the dataset into sandbox
 @tool(
-    name="select_dataset",
-    description="Select a dataset to load into sandbox as a parquet file."
+    name_or_callable="select_dataset",
+    description="Select a dataset to load into sandbox as a parquet file. This will fetch and stage the dataset immediately."
 )
 async def select_dataset_tool(
     dataset_id: Annotated[str, "The dataset ID"],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    from src.datasets.cache import add_entry
+    from src.datasets.cache import add_entry, DatasetStatus, get_entry_status
+    from src.datasets.sync import load_pending_datasets
+    
+    session_id = get_session_key()
+    
+    # Check if dataset is already loaded
+    current_status = get_entry_status(cfg, session_id, dataset_id)
+    if current_status == DatasetStatus.LOADED:
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content=f"Dataset '{dataset_id}' is already loaded and available in the sandbox.",
+                        tool_call_id=tool_call_id,
+                    )
+                ]
+            }
+        )
     
     # Add the dataset to cache with PENDING status
-    session_id = get_session_key()
-    cache_path = add_entry(cfg, session_id, dataset_id, status="pending")
+    cache_path = add_entry(cfg, session_id, dataset_id, status=DatasetStatus.PENDING)
     
-    return Command(
-        update={
-            "messages": [
-                ToolMessage(
-                    content=f"Dataset '{dataset_id}' added to cache with PENDING status. Cache written to: {cache_path}",
-                    tool_call_id=tool_call_id,
-                )
-            ]
-        }
-    )
+    try:
+        # Start the session if not already started
+        session_manager.start(session_id)
+        
+        # Load the dataset into the sandbox
+        container = session_manager.container_for(session_id)
+        loaded_datasets = await load_pending_datasets(
+            cfg=cfg,
+            session_id=session_id,
+            container=container,
+            fetch_fn=get_dataset_bytes,
+            ds_ids=[dataset_id],
+        )
+        
+        if loaded_datasets:
+            dataset_info = loaded_datasets[0]
+            path_in_container = dataset_info["path_in_container"]
+            
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            content=f"Dataset '{dataset_id}' successfully loaded into sandbox at {path_in_container}",
+                            tool_call_id=tool_call_id,
+                        )
+                    ]
+                }
+            )
+        else:
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            content=f"Failed to load dataset '{dataset_id}' - no datasets were loaded",
+                            tool_call_id=tool_call_id,
+                        )
+                    ]
+                }
+            )
+            
+    except Exception as e:
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content=f"Failed to load dataset '{dataset_id}': {str(e)}",
+                        tool_call_id=tool_call_id,
+                    )
+                ]
+            }
+        )
 
 
 # Create single session manager instance
@@ -107,7 +161,6 @@ session_manager = SessionManager(
 
 # Create tools using the shared session manager
 code_exec_tool = make_code_sandbox_tool(
-    fetch_fn=get_dataset_bytes,
     session_manager=session_manager,
     session_key_fn=get_session_key
 )

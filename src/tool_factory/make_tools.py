@@ -11,9 +11,7 @@ from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 
 from src.config import Config
-from src.sandbox.session_manager import SessionManager, DatasetAccess
-from src.datasets.sync import sync_datasets
-from src.datasets.cache import read_ids, read_pending_ids
+from src.sandbox.session_manager import SessionManager
 
 
 def _default_get_session_key() -> str:
@@ -24,7 +22,6 @@ def make_code_sandbox_tool(
     *,
     session_manager: SessionManager,
     session_key_fn: Callable[[], str] = _default_get_session_key,
-    fetch_fn: Optional[Callable[[str], bytes]] = None,
     name: str = "code_sandbox",
     description: str = (
         "Execute Python code in a session-pinned Docker sandbox. "
@@ -34,16 +31,14 @@ def make_code_sandbox_tool(
     timeout_s: int = 30,
 ) -> Callable:
     """
-    Factory that returns a LangChain Tool for executing code inside the sandbox,
-    with optional per-run dataset sync. The provided `fetch_fn` is used when
-    datasets must be staged via API.
+    Factory that returns a LangChain Tool for executing code inside the sandbox.
+    This tool only executes code - dataset loading is handled separately.
 
     Usage:
         session_manager = SessionManager(...)
         code_sandbox = make_code_sandbox_tool(
             session_manager=session_manager,
             session_key_fn=lambda: "conv",
-            fetch_fn=my_fetch_dataset,  # def my_fetch_dataset(ds_id) -> bytes
         )
     """
 
@@ -52,41 +47,15 @@ def make_code_sandbox_tool(
         tool_call_id: Annotated[str, InjectedToolCallId]
         model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # The implementation closes over session_manager, session_key_fn, fetch_fn
-    def _impl(
+    # The implementation closes over session_manager, session_key_fn
+    async def _impl(
         code: Annotated[str, "Python code to run"],
         tool_call_id: Annotated[str, InjectedToolCallId],
     ) -> Command:
         sid = session_key_fn()
         session_manager.start(sid)
 
-        # Initialize resolved datasets list
-        resolved = []
-        
-        # Only sync datasets in API mode (when using API dataset access)
-        if session_manager.dataset_access == DatasetAccess.API:
-            # raise an error if fetch_fn is not provided
-            if fetch_fn is None:
-                raise ValueError("fetch_fn must be provided when using API dataset access")
-
-            # Read PENDING dataset IDs from session cache (created by select_datasets tool)
-            # Create a minimal config for read_pending_ids
-            from src.config import Config
-            cfg = Config.from_env()
-            datasets = read_pending_ids(cfg, sid)
-            
-            if datasets:
-                # Get container reference and sync datasets
-                container = session_manager.container_for(sid)
-                resolved = sync_datasets(
-                    cfg=cfg,
-                    session_id=sid,
-                    container=container,
-                    ds_ids=datasets,
-                    fetch_fn=fetch_fn,  
-                )
-        # NONE and LOCAL_RO modes don't need dataset syncing
-
+        # Execute code - no dataset loading here anymore
         result = session_manager.exec(sid, code, timeout=timeout_s)
 
         artifacts = result.get("artifacts", [])
@@ -109,7 +78,6 @@ def make_code_sandbox_tool(
             "stdout": result.get("stdout", ""),
             "stderr": result.get("error", "") or result.get("stderr", ""),
             "session_dir": result.get("session_dir", ""),
-            "datasets": resolved,  # each item has id/path_in_container/mode/staged
         }
 
         # Combine stdout with artifact information
@@ -159,7 +127,7 @@ def make_export_datasets_tool(
         tool_call_id: Annotated[str, InjectedToolCallId]
         model_config = ConfigDict(arbitrary_types_allowed=True)
     
-    def _impl(
+    async def _impl(
         container_path: Annotated[str, "Path to file inside container (e.g., '/session/data/modified_data.parquet')"], 
         tool_call_id: Annotated[str, InjectedToolCallId]
     ) -> Command:

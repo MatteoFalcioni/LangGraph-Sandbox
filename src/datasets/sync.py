@@ -1,70 +1,69 @@
-# SRC/datasets/sync.py
+# src/datasets/sync.py
 from __future__ import annotations
 
-from typing import Dict, Iterable, List
-
+from typing import Dict, List
 from src.config import Config
-from src.datasets.staging import (
-    stage_dataset_into_sandbox,
-    container_ro_path,
-    container_staged_path,
-    host_bind_data_path,
-)
-# src/datasets/sync.py
-from src.datasets.fetcher import fetch_dataset as _default_fetch
+from src.datasets.staging import stage_dataset_into_sandbox, container_staged_path, container_ro_path
+from src.datasets.cache import DatasetStatus, update_entry_status
 
-async def sync_datasets(
+async def load_pending_datasets(
     *,
     cfg: Config,
     session_id: str,
-    fetch_fn=_default_fetch,
     container,
-    ds_ids: Iterable[str],
+    fetch_fn,
+    ds_ids: List[str],
 ) -> List[Dict[str, str]]:
     """
-    Ensure that all requested datasets are available and accessible inside the container
-    for the current session. This function is typically used in API dataset access mode,
-    where datasets must be explicitly staged (copied) into the container's filesystem.
-
-    For each dataset ID in `ds_ids`:
-      - Check if the dataset file already exists in the container at the expected path.
-      - If it does not exist, call `stage_dataset_into_sandbox` to fetch and copy the dataset
-        into the container (or host bind mount), making it available for use.
-      - If it already exists, just record its descriptor (no need to copy again).
-
+    Load datasets with PENDING status into the sandbox and mark them as LOADED.
+    
+    This function handles the PENDING -> LOADED transition for API mode datasets.
+    For RO mode, it just updates the cache status without actual loading.
+    
     Args:
-        cfg: Config object with environment and path settings.
-        session_id: The current session identifier.
-        fetch_fn: Function to fetch dataset bytes by ID (default: fetch_dataset).
-        container: Docker container handle where datasets should be staged.
-        ds_ids: Iterable of dataset IDs to ensure are available.
-
+        cfg: Config object with environment and path settings
+        session_id: The current session identifier
+        container: Docker container handle (required for API mode)
+        fetch_fn: Function to fetch dataset bytes by ID
+        ds_ids: List of dataset IDs to load (should all be PENDING)
+        
     Returns:
         List of descriptors, one per dataset, each a dict with:
             - "id": dataset id
             - "path_in_container": absolute path to the dataset file inside the container
-
-    Notes:
-        - This function does not check or care about dataset access mode (API/LOCAL_RO/etc);
-          it assumes the caller has already determined that staging is needed.
-        - The cache is used to skip staging; stage_dataset_into_sandbox will check cache internally.
+            
+    Raises:
+        Exception: If loading fails for any dataset
     """
     out: List[Dict[str, str]] = []
-
+    
     for ds_id in ds_ids:
-        # Compute the expected in-container path for this dataset
-        target_in_container = container_staged_path(cfg, ds_id)
-
-        # Stage the dataset - stage_dataset_into_sandbox will check cache internally
-        desc = await stage_dataset_into_sandbox(
-            cfg=cfg,
-            session_id=session_id,
-            container=container,
-            ds_id=ds_id,
-            skip_if_cached=True,   # Skip if already loaded - we only sync pending datasets
-            fetch_fn=fetch_fn,
-        )
-
-        out.append(desc)
-
+        try:
+            if cfg.uses_api_staging:
+                # API mode: actually fetch and stage the dataset
+                desc = await stage_dataset_into_sandbox(
+                    cfg=cfg,
+                    session_id=session_id,
+                    container=container,
+                    ds_id=ds_id,
+                    fetch_fn=fetch_fn,
+                )
+                # Mark as LOADED after successful staging
+                update_entry_status(cfg, session_id, ds_id, DatasetStatus.LOADED)
+            else:
+                # RO mode: just update cache status, assume file exists
+                path = container_ro_path(cfg, ds_id)
+                desc = {
+                    "id": ds_id,
+                    "path_in_container": path,
+                }
+                update_entry_status(cfg, session_id, ds_id, DatasetStatus.LOADED)
+            
+            out.append(desc)
+            
+        except Exception as e:
+            # Mark as FAILED and re-raise
+            update_entry_status(cfg, session_id, ds_id, DatasetStatus.FAILED)
+            raise Exception(f"Failed to load dataset {ds_id}: {e}")
+    
     return out

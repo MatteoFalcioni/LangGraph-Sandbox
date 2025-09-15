@@ -76,3 +76,23 @@ def put_bytes(container, container_path: str, data: bytes, *, mode: int = 0o644)
     # docker-py returns True on success (older versions may not); be lenient but check if False.
     if ok is False:
         raise RuntimeError(f"put_archive returned False for '/{parent}'")
+
+
+def file_exists_in_container(container, container_path: str) -> bool:
+    """
+    Check if a file exists in the container at the given path.
+    
+    Parameters
+    ----------
+    container : docker.models.containers.Container (duck-typed here)
+    container_path : str   Absolute path to the file in the container.
+    
+    Returns
+    -------
+    bool
+        True if the file exists, False otherwise.
+    """
+    rc, _ = container.exec_run(
+        ["/bin/sh", "-lc", f"test -f {shlex.quote(container_path)}"]
+    )
+    return rc == 0
