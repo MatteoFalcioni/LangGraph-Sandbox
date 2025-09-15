@@ -38,7 +38,6 @@ def sync_datasets(
     out: List[Dict[str, str]] = []
 
     for ds_id in ds_ids:
-
         # API
         target_in_container = container_staged_path(cfg, ds_id)
 
@@ -51,7 +50,7 @@ def sync_datasets(
                 session_id=session_id,
                 container=container,
                 ds_id=ds_id,
-                skip_if_cached=False,      # force (re)stage when needed
+                skip_if_cached=False,      # Force staging even if cached - cache just tracks what should be available
                 fetch_fn=fetch_fn,
             )
         else:
