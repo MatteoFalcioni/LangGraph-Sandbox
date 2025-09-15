@@ -5,6 +5,7 @@
 import time
 import uuid
 import os
+import shlex
 from typing import Dict, Optional, List
 
 import docker            # Host-side Docker SDK (controls containers)
@@ -204,7 +205,12 @@ class SessionManager:
 
         # /session mount
         if self.session_storage == SessionStorage.TMPFS:
-            tmpfs["/session"] = f"rw,size={self.tmpfs_size},mode=1777"
+            # Convert MB to Docker size format
+            if isinstance(self.tmpfs_size, int):
+                size_opt = f"{self.tmpfs_size}m"   # MB → Docker option
+            else:
+                size_opt = str(self.tmpfs_size)
+            tmpfs["/session"] = f"rw,size={size_opt},mode=1777"
         else:
             volumes[str(sess_dir)] = {"bind": "/session", "mode": "rw"}
 
@@ -514,9 +520,6 @@ if session_artifacts.exists():
             r.raise_for_status()
             result = r.json()  # {ok, stdout, error?}
 
-        # Clean up memory after execution to prevent space issues
-        self._cleanup_session_memory(session_key)
-
         # Snapshot AFTER & diff
         if info.session_storage == SessionStorage.TMPFS:
             after = self._list_artifact_files_container(container)
@@ -546,6 +549,9 @@ if session_artifacts.exists():
             run_id=None,
             tool_call_id=None,
         )
+
+        # Clean up memory after artifacts are processed to prevent space issues
+        self._cleanup_session_memory(session_key)
 
         # Response
         result["artifacts"] = descriptors
@@ -581,3 +587,83 @@ if session_artifacts.exists():
             List of container names that were removed
         """
         return cleanup_sandbox_containers(verbose=verbose)
+
+    def export_file(self, session_key: str, container_path: str) -> dict:
+        """
+        Export a file from the container's /session/data/ directory to the host.
+        
+        Parameters:
+            session_key: Session identifier
+            container_path: Path to file inside container (must start with /session/data/)
+            
+        Returns:
+            dict with keys:
+              - success: bool
+              - host_path: str (path on host filesystem)
+              - download_url: str (URL to access the file)
+              - error: str (present when success == False)
+        """
+        # Validate session exists
+        if session_key not in self.sessions:
+            return {
+                "success": False,
+                "error": f"Session '{session_key}' not found"
+            }
+        
+        info = self.sessions[session_key]
+        
+        # Validate container path
+        if not container_path.startswith("/session/data/"):
+            return {
+                "success": False,
+                "error": "Path must be in /session/data/ directory"
+            }
+        
+        # Check if file exists in container
+        try:
+            rc, _ = info.container.exec_run(
+                ["/bin/sh", "-c", f"test -f {shlex.quote(container_path)}"]
+            )
+            if rc != 0:
+                return {
+                    "success": False,
+                    "error": f"File '{container_path}' does not exist in container"
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to check file existence: {str(e)}"
+            }
+        
+        # Generate host path with timestamp
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = Path(container_path).name
+        host_filename = f"{timestamp}_{filename}"
+        host_dir = Path("./exports/modified_datasets")
+        host_dir.mkdir(parents=True, exist_ok=True)
+        host_path = host_dir / host_filename
+        
+        try:
+            # Extract file from container
+            stream, _ = info.container.get_archive(container_path)
+            
+            # Write to host filesystem
+            with open(host_path, 'wb') as f:
+                for chunk in stream:
+                    f.write(chunk)
+            
+            # Generate download URL (reuse artifact system if available)
+            download_url = f"file://{host_path.absolute()}"
+            
+            return {
+                "success": True,
+                "host_path": str(host_path.absolute()),
+                "download_url": download_url
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to export file: {str(e)}"
+            }
