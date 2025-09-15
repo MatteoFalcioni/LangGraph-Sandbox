@@ -49,9 +49,11 @@ def test_clear_cache_removes_all_entries(tmp_path):
     assert not is_cached(cfg, sid, "dataset2")
     assert not is_cached(cfg, sid, "dataset3")
     
-    # Verify cache file exists but is empty
+    # Verify cache file exists but is empty (new JSON format)
     assert cache_path.exists()
-    assert cache_path.read_text(encoding="utf-8").strip() == ""
+    import json
+    cache_content = json.loads(cache_path.read_text(encoding="utf-8"))
+    assert cache_content == {"datasets": []}
 
 
 def test_clear_cache_creates_empty_file_if_not_exists(tmp_path):
