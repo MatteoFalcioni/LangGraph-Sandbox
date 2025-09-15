@@ -6,6 +6,8 @@ import time
 import uuid
 import os
 import shlex
+import json
+from datetime import datetime
 from typing import Dict, Optional, List
 
 import docker            # Host-side Docker SDK (controls containers)
@@ -131,6 +133,157 @@ class SessionManager:
         # In-memory registry: session_key -> SessionInfo
         self.sessions: Dict[str, SessionInfo] = {}
 
+    def _write_session_log(self, session_key: str, log_entry: dict) -> None:
+        """
+        Write a log entry to the session's log file (BIND mode only).
+        
+        Args:
+            session_key: Session identifier
+            log_entry: Dictionary containing log data (timestamp, code, result, etc.)
+        """
+        if self.session_storage != SessionStorage.BIND:
+            return
+            
+        info = self.sessions.get(session_key)
+        if not info or not info.session_dir:
+            return
+            
+        log_file = info.session_dir / "session.log"
+        
+        # Add timestamp if not present
+        if "timestamp" not in log_entry:
+            log_entry["timestamp"] = datetime.now().isoformat()
+            
+        # Append to log file
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "\n")
+
+    def _write_session_metadata(self, session_key: str, metadata: dict) -> None:
+        """
+        Write session metadata to a JSON file (BIND mode only).
+        
+        Args:
+            session_key: Session identifier
+            metadata: Dictionary containing session metadata
+        """
+        if self.session_storage != SessionStorage.BIND:
+            return
+            
+        info = self.sessions.get(session_key)
+        if not info or not info.session_dir:
+            return
+            
+        metadata_file = info.session_dir / "session_metadata.json"
+        
+        # Update existing metadata or create new
+        if metadata_file.exists():
+            try:
+                with open(metadata_file, "r", encoding="utf-8") as f:
+                    existing_metadata = json.load(f)
+                existing_metadata.update(metadata)
+                metadata = existing_metadata
+            except (json.JSONDecodeError, FileNotFoundError):
+                pass  # Start fresh if file is corrupted
+                
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, default=str)
+
+    def _get_execution_count(self, session_key: str) -> int:
+        """
+        Get the current execution count for a session (BIND mode only).
+        
+        Args:
+            session_key: Session identifier
+            
+        Returns:
+            Current execution count, or 0 if not available
+        """
+        if self.session_storage != SessionStorage.BIND:
+            return 0
+            
+        info = self.sessions.get(session_key)
+        if not info or not info.session_dir:
+            return 0
+            
+        metadata_file = info.session_dir / "session_metadata.json"
+        if not metadata_file.exists():
+            return 0
+            
+        try:
+            with open(metadata_file, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+            return metadata.get("execution_count", 0)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return 0
+
+    def _save_python_state(self, session_key: str) -> None:
+        """
+        Save current Python state (variables and imports) to session directory (BIND mode only).
+        
+        Args:
+            session_key: Session identifier
+        """
+        if self.session_storage != SessionStorage.BIND:
+            return
+            
+        info = self.sessions.get(session_key)
+        if not info or not info.session_dir:
+            return
+            
+        # Code to extract Python state
+        state_code = """
+import sys
+import json
+from datetime import datetime
+
+# Get current variables (excluding builtins and modules)
+current_vars = {}
+for name, value in globals().items():
+    if not name.startswith('_') and name not in ['sys', 'json', 'datetime']:
+        try:
+            # Try to serialize the value
+            json.dumps(value, default=str)
+            current_vars[name] = {
+                'type': type(value).__name__,
+                'value': str(value)[:1000]  # Truncate long values
+            }
+        except:
+            current_vars[name] = {
+                'type': type(value).__name__,
+                'value': '<non-serializable>'
+            }
+
+# Get imported modules
+imported_modules = list(sys.modules.keys())
+imported_modules = [m for m in imported_modules if not m.startswith('_')]
+
+state = {
+    'timestamp': datetime.now().isoformat(),
+    'variables': current_vars,
+    'imported_modules': imported_modules
+}
+
+# Write to file
+with open('/session/python_state.json', 'w') as f:
+    json.dump(state, f, indent=2)
+"""
+        
+        try:
+            with httpx.Client(timeout=10) as http:
+                r = http.post(
+                    f"http://127.0.0.1:{info.host_port}/exec",
+                    json={"code": state_code, "timeout": 10},
+                )
+                if r.status_code == 200:
+                    # Copy the state file to host
+                    state_file = info.session_dir / "python_state.json"
+                    if (info.session_dir / "python_state.json").exists():
+                        # File already copied by bind mount
+                        pass
+        except Exception:
+            # Don't fail if state saving fails
+            pass
+
     def _sweep_idle(self):
         """
         Remove containers that have been idle longer than IDLE_TIMEOUT_SECS and drop their
@@ -245,6 +398,29 @@ class SessionManager:
                 time.sleep(0.1)
 
         self.sessions[sid] = SessionInfo(container.id, host_port, sess_dir, self.session_storage)
+        
+        # Write initial session metadata (BIND mode only)
+        if self.session_storage == SessionStorage.BIND:
+            initial_metadata = {
+                "session_id": sid,
+                "created_at": datetime.now().isoformat(),
+                "container_id": container.id,
+                "host_port": host_port,
+                "session_storage": self.session_storage.value,
+                "dataset_access": self.dataset_access.value,
+                "image": self.image,
+                "execution_count": 0,
+                "last_used": datetime.now().isoformat()
+            }
+            self._write_session_metadata(sid, initial_metadata)
+            
+            # Log session start
+            self._write_session_log(sid, {
+                "event": "session_started",
+                "container_id": container.id,
+                "host_port": host_port
+            })
+        
         return sid
 
     def get_session_dir(self, session_key: str) -> Path:
@@ -519,6 +695,24 @@ if session_artifacts.exists():
             )
             r.raise_for_status()
             result = r.json()  # {ok, stdout, error?}
+            
+        # Log execution (BIND mode only)
+        if self.session_storage == SessionStorage.BIND:
+            execution_log = {
+                "event": "code_execution",
+                "code": code,
+                "success": result.get("ok", False),
+                "stdout": result.get("stdout", ""),
+                "error": result.get("error", ""),
+                "timeout": timeout
+            }
+            self._write_session_log(session_key, execution_log)
+            
+            # Update execution count in metadata
+            self._write_session_metadata(session_key, {
+                "execution_count": self._get_execution_count(session_key) + 1,
+                "last_used": datetime.now().isoformat()
+            })
 
         # Snapshot AFTER & diff
         if info.session_storage == SessionStorage.TMPFS:
@@ -549,9 +743,30 @@ if session_artifacts.exists():
             run_id=None,
             tool_call_id=None,
         )
+        
+        # Log artifact creation (BIND mode only)
+        if self.session_storage == SessionStorage.BIND and descriptors:
+            artifact_log = {
+                "event": "artifacts_created",
+                "artifact_count": len(descriptors),
+                "artifacts": [
+                    {
+                        "id": desc.get("id"),
+                        "filename": desc.get("name"),
+                        "content_type": desc.get("mime"),
+                        "size_bytes": desc.get("size")
+                    }
+                    for desc in descriptors
+                ]
+            }
+            self._write_session_log(session_key, artifact_log)
 
         # Clean up memory after artifacts are processed to prevent space issues
         self._cleanup_session_memory(session_key)
+        
+        # Save Python state for debugging (BIND mode only)
+        if self.session_storage == SessionStorage.BIND:
+            self._save_python_state(session_key)
 
         # Response
         result["artifacts"] = descriptors
@@ -571,6 +786,20 @@ if session_artifacts.exists():
         info = self.sessions.pop(session_key, None)
         if not info:
             return
+            
+        # Log session stop (BIND mode only)
+        if self.session_storage == SessionStorage.BIND:
+            self._write_session_log(session_key, {
+                "event": "session_stopped",
+                "container_id": info.container_id
+            })
+            
+            # Update final metadata
+            self._write_session_metadata(session_key, {
+                "stopped_at": datetime.now().isoformat(),
+                "final_execution_count": self._get_execution_count(session_key)
+            })
+            
         try:
             self.client.containers.get(info.container_id).remove(force=True)
         except Exception:
