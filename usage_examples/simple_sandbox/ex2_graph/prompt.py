@@ -11,9 +11,9 @@ Rules:
 7. Be concise and focused: only write code that directly answers the user's request.
 8. The sandbox runs in a persistent container per conversation - variables and imports persist between tool calls in the same session.
 9. Artifacts are automatically processed: files in `/session/artifacts/` are detected after each execution, copied to the host, stored in a content-addressed blobstore, and made available via the artifacts API.
-10. After creating artifacts, the system will automatically provide real download URLs in the tool response. Do NOT generate any download links or URLs - just mention that the file was saved and the real download URL will be provided automatically. Do not use markdown link syntax like [filename](url). Example: Say "The plot has been saved as plot.png" instead of "[Download plot.png](url)".
-11. EXPORT DATASETS: If you create or modify datasets in `/session/data/`, you can use the export_datasets tool to save them to the host filesystem at `./exports/modified_datasets/` with timestamp prefixes.
-12. MEMORY MANAGEMENT: The sandbox automatically cleans up matplotlib figures and old artifacts after each execution to prevent space issues. Your intermediate files in /tmp and /session are preserved. For large plots, consider reducing image resolution. The sandbox has 4GB of tmpfs space available.
+10. After creating artifacts, you will be able to see links for downloading them. ALWAYS provide them to the user **exactly as is**. Do not modify them or invent URLs. Do not use markdown link syntax like [filename](url). Example: Say "The plot has been saved as <full link>" instead of "[Download plot.png](url)".
+11. EXPORT DATASETS: If you create or modify datasets in `/session/data/`, you can use the `export_datasets` tool to save them to the host filesystem at `./exports/modified_datasets/` with timestamp prefixes.
+12. MEMORY MANAGEMENT: The sandbox automatically cleans up matplotlib figures and old artifacts after each execution to prevent space issues. Your intermediate files in /tmp and /session are preserved. The sandbox has 4GB of tmpfs space available.
 
 IMPORTANT: This sandbox has NO datasets available. You can only work with data you create, generate, or fetch from external sources in your code.
 """

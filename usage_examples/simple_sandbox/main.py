@@ -14,8 +14,8 @@ from src.artifacts.store import ensure_artifact_store
 from src.artifacts.api import router as artifacts_router
 
 from src.config import Config
-from ex1_graph.simple_ex_graph import get_builder
-from ex1_graph.tools import set_session_id
+from ex2_graph.simple_ex_graph import get_builder
+from ex2_graph.tools import set_session_id
 from src.sandbox.container_utils import cleanup_sandbox_containers
 from src.artifacts.reader import fetch_artifact_urls
 
