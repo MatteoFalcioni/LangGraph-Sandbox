@@ -67,8 +67,8 @@ if __name__ == "__main__":
 
     graph = builder.compile(checkpointer=memory)
 
-    print("=== Simple Sandbox Example (TMPFS_NONE mode) ===\n")
-    print("=== Type /bye to exit. ===\n")
+    print("\n=== Simple Sandbox Example (TMPFS_NONE mode) ===\n")
+    print("\n=== Type /bye to exit. ===\n")
 
     usr_msg = ""
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         if "/bye" in usr_msg.lower():
             break
 
-        print(f"\n--- Processing: {usr_msg} ---")
+        print(f"\n--- Thinking ... ---\n")
         
         try:
             # Use streaming to see real-time output and errors

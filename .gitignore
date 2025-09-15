@@ -9,3 +9,4 @@ docker.env
 simple_sandbox.env
 *.db
 *blobstore*
+exports/

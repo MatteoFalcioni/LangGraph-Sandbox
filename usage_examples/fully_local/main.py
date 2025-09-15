@@ -86,7 +86,7 @@ if __name__ == "__main__":
             clear_cache(cfg, convo_id)
             break
 
-        print(f"\n--- Processing: {usr_msg} ---")
+        print(f"\n--- Thinking ... ---\n")
         
         try:
             # Use streaming to see real-time output and errors
@@ -107,7 +107,9 @@ if __name__ == "__main__":
             import traceback
             traceback.print_exc()
         
-        # Check for artifacts after the entire conversation turn
+        # you can handle artifact detection here - though it is not needed because it is handled by the general artifact system
+        # still could be useful for UI or debugging
+        '''# Check for artifacts after the entire conversation turn
         artifacts = fetch_artifact_urls(convo_id)
         if artifacts:
             print(f"\n📁 Generated Artifacts ({len(artifacts)}):")
@@ -115,6 +117,6 @@ if __name__ == "__main__":
                 print(f"  • {artifact['filename']} ({artifact['mime']})")
                 print(f"    Download: {artifact['download_url']}")
                 print(f"    Size: {artifact['size']} bytes")
-                print()
+                print()'''
         
         print("\n" + "="*50 + "\n")
