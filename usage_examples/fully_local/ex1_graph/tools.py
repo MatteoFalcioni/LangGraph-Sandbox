@@ -4,6 +4,7 @@ from src.sandbox.session_manager import SessionManager
 from pathlib import Path
 from src.artifacts.tokens import create_download_url
 from src.artifacts.reader import get_metadata
+from src.tool_factory.make_codexec_tool import make_export_datasets_tool
 from typing import List, Dict
 import re
 
@@ -51,6 +52,11 @@ session_manager = SessionManager(
 
 # Create tools using the shared session manager
 code_exec_tool = make_code_sandbox_tool(
+    session_manager=session_manager,
+    session_key_fn=get_session_key
+)
+
+export_datasets_tool = make_export_datasets_tool(
     session_manager=session_manager,
     session_key_fn=get_session_key
 )

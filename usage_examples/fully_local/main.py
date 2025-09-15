@@ -16,7 +16,7 @@ from src.datasets.startup import initialize_local_datasets
 
 from src.datasets.cache import clear_cache
 from src.config import Config
-from local_ex_graph import get_builder
+from ex1_graph.local_ex_graph import get_builder
 from tools import set_session_id
 from src.sandbox.container_utils import cleanup_sandbox_containers
 from tools import extract_artifact_references
