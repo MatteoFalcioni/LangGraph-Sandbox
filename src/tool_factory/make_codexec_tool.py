@@ -96,16 +96,34 @@ def make_code_sandbox_tool(
 
         result = manager.exec(sid, code, timeout=timeout_s)
 
+        artifacts = result.get("artifacts", [])
+        
+        # Include artifact information in the content for the agent
+        artifact_info = ""
+        if artifacts:
+            artifact_info = "\n\n📁 Generated Artifacts:\n"
+            for artifact in artifacts:
+                filename = artifact.get('name', 'unknown')
+                size = artifact.get('size', 0)
+                mime = artifact.get('mime', 'unknown')
+                download_url = artifact.get('url', '')
+                artifact_info += f"  • {filename} ({mime}, {size} bytes)\n"
+                if download_url:
+                    artifact_info += f"    Download: {download_url}\n"
+            artifact_info += "\n"
+        
         payload = {
             "stdout": result.get("stdout", ""),
             "stderr": result.get("error", "") or result.get("stderr", ""),
             "session_dir": result.get("session_dir", ""),
             "datasets": resolved,  # each item has id/path_in_container/mode/staged
         }
-        artifacts = result.get("artifacts", [])
+
+        # Combine stdout with artifact information
+        combined_content = result.get("stdout", "") + artifact_info + json.dumps(payload, ensure_ascii=False, indent=2)
 
         tool_msg = ToolMessage(
-            content=json.dumps(payload, ensure_ascii=False),
+            content=combined_content,
             artifact=artifacts,
             tool_call_id=tool_call_id,
         )

@@ -100,14 +100,6 @@ if __name__ == "__main__":
             import traceback
             traceback.print_exc()
         
-        # Check for artifacts after the entire conversation turn
-        artifacts = fetch_artifact_urls(convo_id)
-        if artifacts:
-            print(f"\n📁 Generated Artifacts ({len(artifacts)}):")
-            for artifact in artifacts:
-                print(f"  • {artifact['filename']} ({artifact['mime']})")
-                print(f"    Download: {artifact['download_url']}")
-                print(f"    Size: {artifact['size']} bytes")
-                print()
+        # Artifacts are now displayed directly in the agent's response
         
         print("\n" + "="*50 + "\n")
