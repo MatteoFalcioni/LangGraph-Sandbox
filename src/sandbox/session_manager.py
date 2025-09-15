@@ -850,7 +850,8 @@ if session_artifacts.exists():
         
         # Check if file exists in container
         try:
-            rc, _ = info.container.exec_run(
+            container = self.container_for(session_key)
+            rc, _ = container.exec_run(
                 ["/bin/sh", "-c", f"test -f {shlex.quote(container_path)}"]
             )
             if rc != 0:
@@ -875,7 +876,7 @@ if session_artifacts.exists():
         
         try:
             # Extract file from container
-            stream, _ = info.container.get_archive(container_path)
+            stream, _ = container.get_archive(container_path)
             
             # Write to host filesystem
             with open(host_path, 'wb') as f:
