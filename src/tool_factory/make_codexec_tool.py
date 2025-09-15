@@ -11,7 +11,7 @@ from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 
 from src.config import Config
-from src.sandbox.session_manager import SessionManager
+from src.sandbox.session_manager import SessionManager, DatasetAccess
 from src.datasets.sync import sync_datasets
 from src.datasets.cache import read_ids
 
@@ -22,7 +22,7 @@ def _default_get_session_key() -> str:
 
 def make_code_sandbox_tool(
     *,
-    cfg: Config = Config.from_env(),
+    session_manager: SessionManager,
     session_key_fn: Callable[[], str] = _default_get_session_key,
     fetch_fn: Optional[Callable[[str], bytes]] = None,
     name: str = "code_sandbox",
@@ -39,52 +39,45 @@ def make_code_sandbox_tool(
     datasets must be staged via API.
 
     Usage:
-        CFG = Config.from_env()
+        session_manager = SessionManager(...)
         code_sandbox = make_code_sandbox_tool(
-            cfg=CFG,
+            session_manager=session_manager,
             session_key_fn=lambda: "conv",
             fetch_fn=my_fetch_dataset,  # def my_fetch_dataset(ds_id) -> bytes
         )
     """
-
-    # Build a session manager bound to this cfg
-    manager = SessionManager(
-        image=cfg.sandbox_image,
-        session_storage=cfg.session_storage,
-        dataset_access=cfg.dataset_access,
-        datasets_path=cfg.datasets_host_ro,
-        session_root=cfg.sessions_root,
-        tmpfs_size=cfg.tmpfs_size_mb,
-    )
 
     class ExecuteCodeArgs(BaseModel):
         code: str = Field(description="Python code to execute in the sandbox.")
         tool_call_id: Annotated[str, InjectedToolCallId]
         model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # The implementation closes over cfg, manager, session_key_fn, fetch_fn
+    # The implementation closes over session_manager, session_key_fn, fetch_fn
     def _impl(
         code: Annotated[str, "Python code to run"],
         tool_call_id: Annotated[str, InjectedToolCallId],
     ) -> Command:
         sid = session_key_fn()
-        manager.start(sid)
+        session_manager.start(sid)
 
         # Initialize resolved datasets list
         resolved = []
         
         # Only sync datasets in API mode (when using API dataset access)
-        if cfg.uses_api_staging:
+        if session_manager.dataset_access == DatasetAccess.API:
             # raise an error if fetch_fn is not provided
             if fetch_fn is None:
                 raise ValueError("fetch_fn must be provided when using API dataset access")
 
             # Read dataset IDs from session cache (created by select_datasets tool)
+            # Create a minimal config for read_ids
+            from src.config import Config
+            cfg = Config.from_env()
             datasets = read_ids(cfg, sid)
             
             if datasets:
                 # Get container reference and sync datasets
-                container = manager.container_for(sid)
+                container = session_manager.container_for(sid)
                 resolved = sync_datasets(
                     cfg=cfg,
                     session_id=sid,
@@ -94,7 +87,7 @@ def make_code_sandbox_tool(
                 )
         # NONE and LOCAL_RO modes don't need dataset syncing
 
-        result = manager.exec(sid, code, timeout=timeout_s)
+        result = session_manager.exec(sid, code, timeout=timeout_s)
 
         artifacts = result.get("artifacts", [])
         
@@ -134,4 +127,64 @@ def make_code_sandbox_tool(
         name_or_callable=name,
         description=description,
         args_schema=ExecuteCodeArgs,
+    )(_impl)
+
+
+def make_export_datasets_tool(
+    *,
+    session_manager: SessionManager,
+    session_key_fn: Callable[[], str] = _default_get_session_key,
+    name: str = "export_datasets",
+    description: str = (
+        "Export a modified dataset from /session/data/ to ./exports/modified_datasets/ "
+        "with timestamp prefix. Use this to save processed or modified datasets "
+        "from the sandbox to the host filesystem."
+    ),
+) -> Callable:
+    """
+    Create a tool for exporting files from the container's /session/data/ directory.
+    
+    Parameters:
+        session_manager: SessionManager instance to use for container operations
+        session_key_fn: Function to get current session key
+        name: Tool name
+        description: Tool description
+        
+    Returns:
+        LangChain tool function
+    """
+    
+    class ExportDatasetArgs(BaseModel):
+        container_path: Annotated[str, Field(description="Path to file inside container (e.g., '/session/data/modified_data.parquet')")]
+    
+    def _impl(container_path: Annotated[str, "Path to file inside container (e.g., '/session/data/modified_data.parquet')"], call_id: InjectedToolCallId) -> Command:
+        """Export a file from container to host filesystem."""
+        session_key = session_key_fn()
+        
+        # Call the session manager's export method
+        result = session_manager.export_file(session_key, container_path)
+        
+        if result["success"]:
+            tool_msg = ToolMessage(
+                content=(
+                    f"Successfully exported dataset:\n"
+                    f"  Container path: {container_path}\n"
+                    f"  Host path: {result['host_path']}\n"
+                    f"  Download URL: {result['download_url']}"
+                ),
+                tool_call_id=call_id,
+            )
+        else:
+            tool_msg = ToolMessage(
+                content=f"Failed to export dataset: {result['error']}",
+                tool_call_id=call_id,
+            )
+        
+        return Command(update={"messages": [tool_msg]})
+    
+    # Return a LangChain Tool by applying the decorator at factory time
+    return tool(
+        name_or_callable=name,
+        description=description,
+        args_schema=ExportDatasetArgs,
     )(_impl)
