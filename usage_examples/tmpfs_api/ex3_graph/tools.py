@@ -100,13 +100,18 @@ async def select_dataset_tool(
         # Start the session if not already started
         session_manager.start(session_id)
         
+        # Create a wrapper function for get_dataset_bytes that only takes dataset_id
+        async def fetch_dataset_wrapper(ds_id: str) -> bytes:
+            return await get_dataset_bytes(client, ds_id)
+        
         # Load the dataset into the sandbox
         container = session_manager.container_for(session_id)
+        
         loaded_datasets = await load_pending_datasets(
             cfg=cfg,
             session_id=session_id,
             container=container,
-            fetch_fn=get_dataset_bytes,
+            fetch_fn=fetch_dataset_wrapper,
             ds_ids=[dataset_id],
         )
         

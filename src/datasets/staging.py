@@ -84,8 +84,27 @@ async def stage_dataset_into_sandbox(
     data = await fetch_fn(ds_id)
 
     if cfg.is_tmpfs:
-        # Write directly into container tmpfs
-        put_bytes(container, container_staged_path(cfg, ds_id), data)
+        # Write directly into container tmpfs using a simpler approach
+        # Ensure /session/data directory exists first
+        rc, _ = container.exec_run(["/bin/sh", "-lc", "mkdir -p /session/data"])
+        if rc != 0:
+            raise RuntimeError(f"Failed to create /session/data directory in container (rc={rc})")
+        
+        # Write file using base64 encoding to avoid tar issues
+        import base64
+        encoded_data = base64.b64encode(data).decode('ascii')
+        filename = f"{ds_id}.parquet"
+        
+        # Write the file using echo and base64 decode
+        cmd = f"echo '{encoded_data}' | base64 -d > /session/data/{filename}"
+        rc, out = container.exec_run(["/bin/sh", "-lc", cmd])
+        if rc != 0:
+            raise RuntimeError(f"Failed to write file {filename} to container (rc={rc}): {out}")
+        
+        # Verify the file was written
+        rc, out = container.exec_run(["/bin/sh", "-lc", f"ls -la /session/data/{filename}"])
+        if rc != 0:
+            raise RuntimeError(f"Failed to verify file {filename} was written")
     else:
         # BIND: write to host, appears in container
         dest = host_bind_data_path(cfg, session_id, ds_id)

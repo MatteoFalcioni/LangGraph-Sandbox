@@ -83,17 +83,22 @@ if __name__ == "__main__":
         
         try:
             # Use streaming to see real-time output and errors
-            for chunk in graph.stream(
-                {"messages": [{"role": "user", "content": usr_msg}]},
-                {"configurable": {"thread_id": f"{convo_id}"}, "recursion_limit": 25},
-            ):
-                print(f"AI: {chunk['chat_model']['messages'][-1].content}")
-                
-                # Check if this is the final result
-                if "messages" in chunk and chunk["messages"]:
-                    last_message = chunk["messages"][-1]
-                    if hasattr(last_message, 'content') and last_message.content:
-                        print(f"\nAI: {last_message.content}")
+            import asyncio
+            
+            async def run_stream():
+                async for chunk in graph.astream(
+                    {"messages": [{"role": "user", "content": usr_msg}]},
+                    {"configurable": {"thread_id": f"{convo_id}"}, "recursion_limit": 25},
+                ):
+                    print(f"AI: {chunk['chat_model']['messages'][-1].content}")
+                    
+                    # Check if this is the final result
+                    if "messages" in chunk and chunk["messages"]:
+                        last_message = chunk["messages"][-1]
+                        if hasattr(last_message, 'content') and last_message.content:
+                            print(f"\nAI: {last_message.content}")
+            
+            asyncio.run(run_stream())
                         
         except Exception as e:
             print(f"\nERROR: {e}")
