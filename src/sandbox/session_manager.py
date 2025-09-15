@@ -395,6 +395,74 @@ class SessionManager:
             time.sleep(0.05)  # brief backoff, then retry
 
         raise RuntimeError(f"Failed to copy {container_path} from container after retries")
+
+    def _cleanup_session_memory(self, session_key: str) -> None:
+        """
+        Clean up memory in the sandbox to prevent 'No space left on device' errors.
+        This method runs after each code execution and focuses on the main memory hogs:
+        - Matplotlib figures (biggest memory consumer)
+        - Python garbage collection
+        - Old artifacts (after they're ingested)
+        
+        Does NOT clean /tmp or /var/tmp to preserve user files.
+        """
+        info = self.sessions.get(session_key)
+        if not info:
+            return
+
+        container = self.client.containers.get(info.container_id)
+        
+        # Targeted cleanup code - only clean what causes space issues
+        cleanup_code = """
+import gc
+from pathlib import Path
+
+# Clear Python garbage collection
+gc.collect()
+
+# Clear matplotlib figures (main memory hog)
+try:
+    import matplotlib
+    matplotlib.pyplot.close('all')
+    matplotlib.pyplot.clf()
+    matplotlib.pyplot.cla()
+    # Also clear any cached figures
+    if hasattr(matplotlib.pyplot, 'get_fignums'):
+        for fig_num in matplotlib.pyplot.get_fignums():
+            matplotlib.pyplot.close(fig_num)
+except:
+    pass
+
+# Clear old artifacts (after they're ingested, preserve structure)
+session_artifacts = Path('/session/artifacts')
+if session_artifacts.exists():
+    for item in session_artifacts.iterdir():
+        try:
+            if item.is_file():
+                item.unlink()
+            elif item.is_dir():
+                # Only remove empty directories, preserve structure
+                try:
+                    item.rmdir()
+                except OSError:
+                    # Directory not empty, leave it
+                    pass
+        except:
+            pass
+"""
+
+        # Execute cleanup code in the container
+        try:
+            with httpx.Client(timeout=10) as http:
+                r = http.post(
+                    f"http://127.0.0.1:{info.host_port}/exec",
+                    json={"code": cleanup_code, "timeout": 10},
+                )
+                r.raise_for_status()
+        except Exception:
+            # Don't fail the main execution if cleanup fails
+            pass
+
     def exec(self, session_key: str, code: str, timeout: int = 30) -> dict:
         """
         Execute Python code inside the session's container via the in-container REPL.
@@ -445,6 +513,9 @@ class SessionManager:
             )
             r.raise_for_status()
             result = r.json()  # {ok, stdout, error?}
+
+        # Clean up memory after execution to prevent space issues
+        self._cleanup_session_memory(session_key)
 
         # Snapshot AFTER & diff
         if info.session_storage == SessionStorage.TMPFS:
