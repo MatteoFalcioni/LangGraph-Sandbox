@@ -883,8 +883,21 @@ if session_artifacts.exists():
                 for chunk in stream:
                     f.write(chunk)
             
-            # Generate download URL (reuse artifact system if available)
-            download_url = f"file://{host_path.absolute()}"
+            # Ingest the exported file into the artifact system to get proper download URL
+            descriptors = ingest_files(
+                new_host_files=[host_path],
+                session_id=session_key,
+                run_id=None,
+                tool_call_id=None,
+            )
+            
+            # Get the download URL from the artifact descriptor
+            download_url = ""
+            if descriptors and len(descriptors) > 0:
+                artifact_desc = descriptors[0]
+                download_url = artifact_desc.get("url", f"file://{host_path.absolute()}")
+            else:
+                download_url = f"file://{host_path.absolute()}"
             
             return {
                 "success": True,
