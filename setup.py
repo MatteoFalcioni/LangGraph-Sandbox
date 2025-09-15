@@ -26,6 +26,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=find_packages(),
+    py_modules=["main"],
     python_requires=">=3.11",
     install_requires=requirements,
     extras_require={

@@ -2,7 +2,7 @@ Metadata-Version: 2.4
 Name: langgraph-sandbox
 Version: 0.1.0
 Summary: A sandbox environment for LangGraph with artifact storage and dataset management
-Author: Matteo
+Author: Matteo Falcioni
 License: MIT
 Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Developers
@@ -13,7 +13,7 @@ Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
-Requires-Python: >=3.8
+Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 Requires-Dist: langgraph==0.6.7
 Requires-Dist: langgraph-checkpoint==2.1.0
@@ -37,285 +37,316 @@ Requires-Dist: flake8; extra == "dev"
 Requires-Dist: mypy; extra == "dev"
 Dynamic: requires-python
 
-# Docker Sandbox Agent – Artifact Store Edition
+# LangGraph Sandbox – Docker-Based Code Execution Environment
 
-This project provides a **Docker‑based sandbox** for executing Python code inside a LangGraph agentic system. It replaces services like E2B by running containers that isolate execution, enforce resource limits, and allow safe interaction with datasets.
+A production-ready Docker sandbox for executing Python code within LangGraph agentic systems. Provides secure, isolated code execution with persistent state, dataset management, and automatic artifact storage.
 
-The sandbox keeps Python state across tool calls and persists produced files in a **database‑backed artifact store**. Artifacts are deduplicated, assigned stable IDs, and can be downloaded or read later without exposing raw filesystem paths.
+## Table of Contents
 
----
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Execution Modes](#execution-modes)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Usage Examples](#usage-examples)
+- [Artifact System](#artifact-system)
+- [Session Management](#session-management)
+- [Development & Debugging](#development--debugging)
+- [Installation](#installation)
+- [API Reference](#api-reference)
+- [Security](#security)
+- [Troubleshooting](#troubleshooting)
 
-## Execution Mode
+## Overview
 
-* **Session‑pinned containers**: one container per conversation (session).
+This sandbox replaces services like E2B by running isolated Docker containers for each conversation session. It provides:
 
-  * Variables and imports live in RAM.
-  * `/session` can be backed by either **tmpfs (RAM)** or a **bind mount** on the host (`./sessions/<sid>`).
-  * With tmpfs, all data lives in memory and is discarded on container removal.
-  * With bind mount, a host folder persists session state for local inspection.
+- **Session-pinned containers**: One container per conversation with persistent Python state
+- **Multiple storage modes**: RAM (TMPFS) or disk (BIND) for session data
+- **Flexible dataset access**: No datasets, local read-only mounts, or API-based staging
+- **Automatic artifact management**: Files are deduplicated, stored securely, and accessible via signed URLs
+- **Enhanced debugging**: Complete execution logs and state inspection in BIND mode
 
----
+## Key Features
 
-## Storage & Dataset Modes
+- ✅ **Resource isolation**: CPU, memory, and timeout limits
+- ✅ **Session state persistence**: Variables and imports persist across tool calls
+- ✅ **Six execution modes**: From simple code execution to full dataset analysis
+- ✅ **Automatic artifact pipeline**: Deduplication, metadata tracking, and secure downloads
+- ✅ **Enhanced debugging**: Complete execution logs and state snapshots (BIND mode)
+- ✅ **Production-ready**: Secure token system, configurable timeouts, and error handling
 
-Two independent knobs define runtime behavior:
+## Execution Modes
 
-* **SessionStorage**: `BIND` (disk) vs `TMPFS` (RAM)
-* **DatasetAccess**: `NONE` (no datasets) vs `LOCAL_RO` (host datasets at `/data`) vs `API` (datasets staged into `/session/data`)
+The system offers six execution modes based on two independent configuration knobs:
 
-### The Six Modes
-
-| ID    | SessionStorage | DatasetAccess  | Description                                                                 | When to use                                                    |
-| ----- | -------------- | -------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **TMPFS_NONE** | **TMPFS**      | **NONE**       | Simple sandbox in RAM, no datasets                                         | General code execution, algorithms, lightweight demos          |
-| **BIND_NONE** | **BIND**       | **NONE**       | Simple sandbox on disk, no datasets                                        | Persistent code execution, debugging without data              |
-| **TMPFS_LOCAL** | **TMPFS**      | **LOCAL\_RO**  | Session in RAM, datasets from host RO at `/data`                            | Big/static datasets + fast ephemeral scratch; immutable inputs |
-| **BIND_LOCAL** | **BIND**       | **LOCAL\_RO**  | Session on disk (`./sessions/<sid>`), datasets mounted RO at `/data`        | Super local dev, debugging, persistent session files           |
-| **TMPFS_API** | **TMPFS**      | **API** | Fully ephemeral: datasets staged into `/session/data` (RAM), session in RAM | Lightweight, multi‑tenant, API‑fed demos (default)            |
-| **BIND_API** | **BIND**       | **API** | Datasets staged into `/session/data`, session on disk                       | Persistent session folder but API‑fetched datasets (rare)      |
+| Mode | Session Storage | Dataset Access | Description | Best For |
+|------|----------------|----------------|-------------|----------|
+| **TMPFS_NONE** | RAM (TMPFS) | None | Simple sandbox in memory | Algorithms, calculations, demos |
+| **BIND_NONE** | Disk (BIND) | None | Persistent sandbox on disk | Debugging, persistent development |
+| **TMPFS_LOCAL** | RAM (TMPFS) | Local RO | Memory + host datasets | Fast analysis with large datasets |
+| **BIND_LOCAL** | Disk (BIND) | Local RO | Persistent + host datasets | Full development with datasets |
+| **TMPFS_API** | RAM (TMPFS) | API | Memory + API datasets | Multi-tenant, cloud datasets |
+| **BIND_API** | Disk (BIND) | API | Persistent + API datasets | Development with API datasets |
 
 ### Recommended Defaults
 
-* **Simple code execution:** **TMPFS_NONE** - Perfect for general-purpose coding without datasets
-* **Production / multi‑tenant demos:** **TMPFS_API** - If datasets are huge & stable, prefer **TMPFS_LOCAL**
-* **Local dev/debug:** **BIND_LOCAL** - For persistent development with local datasets
+- **Simple coding**: `TMPFS_NONE` - Perfect for general-purpose coding without datasets
+- **Production demos**: `TMPFS_API` - Multi-tenant with dynamic dataset loading
+- **Local development**: `BIND_LOCAL` - Full debugging with local datasets
 
----
+## Quick Start
 
-## Datasets
+### 1. Clone the repository and build the Docker Image
 
-* **NONE:** No datasets - simple code execution environment. Perfect for general-purpose coding, algorithms, and demos without data dependencies.
-* **LOCAL\_RO:** Mount a host datasets directory read‑only at `/data`. Good for large/static inputs.
-* **API\_TMPFS:** Fetch datasets on demand into `/session/data/<id>.parquet`. Cleanest for ephemeral runs.
-
-### Dataset staging flow (API\_TMPFS)
-
-1. The agent calls the **download tool** with `ds_id`.
-2. `src/datasets/staging.py::stage_dataset_into_sandbox(...)` decides how to stage:
-
-   * **TMPFS** → pushes bytes into the running container at `/session/data/<id>.parquet`.
-   * **BIND**  → writes bytes on host at `./sessions/<sid>/data/<id>.parquet` (bind‑mounted into the container).
-3. The host cache list `./sessions/<sid>/cache_datasets.txt` is updated with `ds_id` (idempotent, no pre‑exec sync at this stage by design).
-
-> **Fetcher is FAKE for now. Replace it in production.**
-> `src/datasets/fetcher.py` currently returns placeholder bytes. Swap it with a function that calls your real API and returns raw **Parquet bytes**:
->
-> ```python
-> # src/datasets/fetcher.py
-> def fetch_dataset(ds_id: str) -> bytes:
->     """Return the Parquet file content for `ds_id` as bytes (raise on failure)."""
->     ...
-> ```
->
-> You can also inject a custom fetcher via the `fetch_fn` argument of `stage_dataset_into_sandbox(...)` (useful for testing or multiple backends).
-
----
-
-## Artifacts
-
-* User code writes files under `/session/artifacts/`.
-* After each execution:
-
-  1. Sandbox diffs the artifact folder (before vs after run).
-  2. New files are copied out of the container (TMPFS) or read from host (BIND).
-  3. Files are ingested into the artifact store:
-
-     * Saved in `blobstore/` under SHA‑256.
-     * Metadata logged in `artifacts.db`.
-     * Deduplication handled automatically.
-     * Removed from `/session/artifacts/` after ingestion.
-  4. Descriptors returned with `id`, `name`, `size`, `mime`, `sha256`, `created_at`, `url`.
-
-### Artifact Security
-
-The artifact system automatically generates secure tokens for download URLs. No manual configuration required!
-
-**Optional Environment Variables:**
-* `ARTIFACTS_PUBLIC_BASE_URL`: Base URL for artifact downloads (default: `http://localhost:8000`)
-* `ARTIFACTS_TOKEN_TTL_SECONDS`: Token expiration time in seconds (default: 600)
-
-```env
-# Optional: Override defaults
-ARTIFACTS_PUBLIC_BASE_URL=http://your-domain.com
-ARTIFACTS_TOKEN_TTL_SECONDS=300
-```
-
-**Security Features:**
-- ✅ **Auto-generated secrets**: Secure token signing key generated at startup
-- ✅ **Short-lived tokens**: Default 10-minute expiration
-- ✅ **No manual configuration**: Works out of the box
-
----
-
-## Capabilities
-
-* ✅ **Resource isolation**: CPU, memory, timeout limits
-* ✅ **Session state persistence**: RAM (TMPFS) or disk (BIND)
-* ✅ **Multiple dataset modes**: NONE, LOCAL_RO (read-only mount), API (on-demand staging)
-* ✅ **Artifact pipeline**: deduplication, DB metadata, signed download URLs
-* ✅ **Simple mode**: NONE mode for general-purpose code execution without datasets
-
----
-
-## Installation
-
-1. **Clone and build:**
    ```bash
    git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
    cd LangGraph-Sandbox
    docker build -t py-sandbox:latest -f Dockerfile .
    ```
 
-2. **Install dependencies:**
+### 2. Install Dependencies
+
    ```bash
    pip install -r requirements.txt
    ```
-   Required: `docker`, `httpx`, `langgraph`, `langchain-core`, `pydantic` (plus sandbox image packages like `pandas`, `matplotlib`).
 
----
+### 3. Run Simple Example
 
-## Environment configuration
+```bash
+# Simple code execution (no datasets)
+DATASET_ACCESS=NONE python main.py
+```
 
-The app reads its configuration from environment variables (no special file required). Defaults target **TMPFS_API**: `SESSION_STORAGE=TMPFS` + `DATASET_ACCESS=API`.
+### 4. Set Your OpenAI API Key
 
-### example.env
+Create a `.env` file or set environment variable:
+```bash
+export OPENAI_API_KEY=your_api_key_here
+```
+
+## Configuration
+
+Configuration is managed through environment variables with sensible defaults:
+
+### Core Settings
 
 ```env
-# example.env — rename to .env or pass with --env-file
+# Session storage: TMPFS (RAM) or BIND (disk)
+SESSION_STORAGE=TMPFS
 
-# --- Core knobs ---
-SESSION_STORAGE=TMPFS        # TMPFS | BIND
-DATASET_ACCESS=API     # NONE | LOCAL_RO | API
+# Dataset access: NONE, LOCAL_RO, or API
+DATASET_ACCESS=API
 
-# --- Host paths ---
+# Paths (optional - defaults provided)
 SESSIONS_ROOT=./sessions
 BLOBSTORE_DIR=./blobstore
 ARTIFACTS_DB=./artifacts.db
 
-# Required ONLY if DATASET_ACCESS=LOCAL_RO
-# DATASETS_HOST_RO=./example_llm_data
-
-# --- Docker / runtime ---
-SANDBOX_IMAGE=sandbox:latest
-TMPFS_SIZE_MB=1024
-
-# --- Artifacts service ---
-ARTIFACTS_TOKEN_SECRET=sk-tk123456789098765432112345678900000001111
-ARTIFACTS_PUBLIC_BASE_URL=http://localhost:8000
-ARTIFACTS_TOKEN_TTL_SECONDS=600
-```
-
-### Quick Start Examples
-
-**Simple code execution (no datasets):**
-```env
-DATASET_ACCESS=NONE
-```
-
-**Local development with datasets:**
-```env
-SESSION_STORAGE=BIND
-DATASET_ACCESS=LOCAL_RO
+# Required only for LOCAL_RO mode
 DATASETS_HOST_RO=./example_llm_data
+
+# Docker settings
+SANDBOX_IMAGE=py-sandbox:latest
+TMPFS_SIZE_MB=1024
 ```
 
-**Production API-fed demos (default):**
-```env
-SESSION_STORAGE=TMPFS
-DATASET_ACCESS=API
-```
+### Quick Configuration Examples
 
-### Variables
-
-**Core Configuration:**
-* `SESSION_STORAGE`: `TMPFS` (RAM, ephemeral) or `BIND` (host folder `./sessions/<sid>`).
-* `DATASET_ACCESS`: `NONE` (no datasets), `LOCAL_RO` (mount host datasets at `/data`), or `API` (stage datasets into `/session/data`).
-
-**Paths:**
-* `SESSIONS_ROOT`: host dir for sessions (BIND mode & logs). Default `./sessions`.
-* `BLOBSTORE_DIR`: host blob store root. Default `./blobstore`.
-* `ARTIFACTS_DB`: SQLite path for artifact metadata. Default `./artifacts.db`.
-* `DATASETS_HOST_RO`: **required only** when `DATASET_ACCESS=LOCAL_RO` (e.g., `./example_llm_data`).
-
-**Docker:**
-* `SANDBOX_IMAGE`: Docker image name/tag. Default `sandbox:latest`.
-* `TMPFS_SIZE_MB`: tmpfs size for `/session` when using TMPFS. Default `1024`.
-
-**Artifacts Security:**
-* `ARTIFACTS_PUBLIC_BASE_URL`: Base URL for artifact downloads (optional, default: `http://localhost:8000`).
-* `ARTIFACTS_TOKEN_TTL_SECONDS`: Token expiration time in seconds (optional, default: 600).
-* **Note**: Token signing secret is auto-generated at startup for security.
-
-### Usage
-
-* Shell: `export SESSION_STORAGE=TMPFS` … `python main.py`
-* Docker: `docker run --env-file ./.env your-image`
-* Compose: add `env_file: [.env]` or `environment:` entries.
-
-> Tip: add `.env` / `docker.env` to `.gitignore` if they may contain machine‑specific paths or secrets.
-
----
-
-## Usage
-
-Run your LangGraph app:
+**Simple execution:**
 ```bash
-python main.py
-```
-
-The agent can now invoke the code execution tool. User code writes files to `/session/artifacts/` which are automatically ingested into the artifact store with deduplication and signed download URLs.
-
----
-
-## Repository Layout
-
-```text
-src/
-  artifacts/                 # artifact store (blob + DB bindings)
-  datasets/                  # dataset staging and caching
-  sandbox/                   # container lifecycle and I/O
-  config.py                  # environment configuration
-
-langgraph_app/               # LangGraph tools and graph assembly
-sessions/                    # per-session folders (BIND mode)
-blobstore/                   # deduped artifact blobs
-artifacts.db                 # artifact metadata
-```
-
----
-
-## Testing
-
-```bash
-pytest -q
-```
-Unit tests cover config, I/O helpers, dataset cache, staging, and end-to-end integration.
-
----
-
-## Quick Reference
-
-| Use Case | Mode | Environment Variables |
-|----------|------|----------------------|
-| **Simple coding, algorithms** | `TMPFS_NONE` | `DATASET_ACCESS=NONE` |
-| **Local dev with datasets** | `BIND_LOCAL` | `SESSION_STORAGE=BIND` + `DATASET_ACCESS=LOCAL_RO` |
-| **Production API demos** | `TMPFS_API` | `DATASET_ACCESS=API` (default) |
-
-```bash
-# Simple execution
 DATASET_ACCESS=NONE python main.py
+```
 
-# Local development
-SESSION_STORAGE=BIND DATASET_ACCESS=LOCAL_RO DATASETS_HOST_RO=./example_llm_data python main.py
+**Local development:**
+```bash
+SESSION_STORAGE=BIND DATASET_ACCESS=LOCAL_RO DATASETS_HOST_RO=./data python main.py
+```
 
-# Production (default)
+**Production (default):**
+```bash
 python main.py
 ```
 
----
+## Usage Examples
 
-## Next steps
+The repository includes three complete examples demonstrating different modes:
 
-* Add quotas and retention policies (per‑session max size, automatic cleanup).
-* Swap SQLite/blobstore to Postgres + S3/MinIO for scalability.
-* Extend the fetcher to expose integrity/metadata (e.g., return `(bytes, sha256, version)`), then add a host cache by hash for cross‑session reuse.
+### Simple Sandbox (TMPFS_NONE)
+```bash
+cd usage_examples/simple_sandbox
+python main.py
+```
+- No datasets, pure code execution
+- Perfect for algorithms and calculations
+- Everything runs in memory
+
+### Fully Local (BIND_LOCAL)
+```bash
+cd usage_examples/fully_local
+python main.py
+```
+- Persistent session storage
+- Local datasets mounted read-only
+- Full debugging capabilities
+
+### TMPFS API (TMPFS_API)
+```bash
+cd usage_examples/tmpfs_api
+python main.py
+```
+- Dynamic dataset fetching via API
+- Memory-based caching
+- Multi-tenant ready
+
+## Artifact System
+
+Files saved to `/session/artifacts/` are automatically processed:
+
+1. **Ingestion**: Files are copied from the container
+2. **Deduplication**: SHA-256 based content addressing
+3. **Storage**: Saved in `blobstore/` with metadata in SQLite
+4. **Access**: Secure download URLs with time-limited tokens
+5. **Cleanup**: Original files removed from session directory
+
+### Artifact Features
+
+- **Automatic deduplication**: Identical files share storage
+- **Secure downloads**: Signed URLs with configurable expiration
+- **Metadata tracking**: Size, MIME type, creation time, session links
+- **Content addressing**: SHA-256 based blob storage
+- **API access**: REST endpoints for artifact management
+
+### Security
+
+- ✅ **Auto-generated secrets**: Secure token signing keys
+- ✅ **Short-lived tokens**: Default 10-minute expiration
+- ✅ **No manual configuration**: Works out of the box
+- ✅ **Content verification**: SHA-256 integrity checking
+
+## Session Management
+
+### Session Lifecycle
+
+1. **Creation**: Container started with session-specific configuration
+2. **Execution**: Code runs with persistent Python state
+3. **Artifact Processing**: Files automatically ingested after each run
+4. **Cleanup**: Container stopped, resources released
+
+### Session State
+
+- **Variables**: All Python variables persist between executions
+- **Imports**: Module imports remain available
+- **Working Directory**: Consistent `/session` working directory
+- **Environment**: Isolated Python environment with common packages
+
+## Development & Debugging
+
+### BIND Mode Enhanced Features
+
+When using `SESSION_STORAGE=BIND`, the system provides comprehensive debugging capabilities:
+
+#### Session Directory Structure
+```
+sessions/<session_id>/
+├── session.log                    # Complete execution history
+├── session_metadata.json          # Session info and statistics
+├── python_state.json             # Current Python state snapshot
+└── artifacts/                    # Files before ingestion
+```
+
+#### Session Viewer Tool
+```bash
+# View complete session information
+python src/sandbox/session_viewer.py sessions/<session_id>
+
+# View last 10 log entries
+python src/sandbox/session_viewer.py sessions/<session_id> --limit 10
+
+# Skip state and artifacts display
+python src/sandbox/session_viewer.py sessions/<session_id> --no-state --no-artifacts
+```
+
+#### Debugging Benefits
+
+- **Complete execution history**: See all code executed and results
+- **State inspection**: View variables, imports, and Python environment
+- **Artifact tracking**: Monitor file creation and processing
+- **Container information**: Track container lifecycle and configuration
+- **Performance analysis**: Execution timing and resource usage
+
+### Available Tools
+
+The system provides two main tools:
+
+1. **`code_sandbox`**: Execute Python code with persistent state
+2. **`export_datasets`**: Export modified datasets to host filesystem
+
+## Installation
+
+### Prerequisites
+
+- Docker installed and running
+- Python 3.8+ 
+- OpenAI API key
+
+### Dependencies
+
+Core dependencies (see `requirements.txt`):
+- `langgraph` - Graph-based agent framework
+- `docker` - Container management
+- `fastapi` - Artifact API server
+- `pydantic` - Data validation
+
+### Docker Image
+
+The sandbox runs in a custom Docker image with:
+- Python 3.11
+- Common data science packages (pandas, numpy, matplotlib, etc.)
+- Security-hardened configuration
+- Resource limits and timeouts
+
+## API Reference
+
+### Artifact API Endpoints
+
+- `GET /artifacts/{artifact_id}?token={token}` - Download artifact
+- `HEAD /artifacts/{artifact_id}?token={token}` - Get artifact metadata
+
+### Configuration API
+
+- `Config.from_env()` - Load configuration from environment
+- `Config.from_env(env_file_path)` - Load from specific file
+
+### Session Management
+
+- `SessionManager.start(session_id)` - Start new session
+- `SessionManager.exec(session_id, code)` - Execute code
+- `SessionManager.stop(session_id)` - Stop session
+## Troubleshooting
+
+### Common Issues
+
+**Container startup failures:**
+- Ensure Docker is running
+- Check `SANDBOX_IMAGE` points to correct image
+- Verify sufficient disk space
+
+**Dataset access problems:**
+- For `LOCAL_RO`: Ensure `DATASETS_HOST_RO` path exists
+- For `API`: Check network connectivity and API configuration
+- Verify dataset files are in Parquet format
+
+**Artifact download failures:**
+- Check artifact server is running (port 8000)
+- Verify token hasn't expired
+- Ensure artifact ID is correct
+
+## Next Steps
+
+- **Quotas**: Add per-session size limits and retention policies
+- **Scalability**: Migrate to Postgres + S3/MinIO for production
+- **Monitoring**: Add metrics and health checks
+- **Extensions**: Support for additional languages and frameworks
+
+For more examples and detailed documentation, see the `usage_examples/` directory.
