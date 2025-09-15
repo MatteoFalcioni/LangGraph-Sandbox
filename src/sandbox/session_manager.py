@@ -883,21 +883,34 @@ if session_artifacts.exists():
                 for chunk in stream:
                     f.write(chunk)
             
-            # Ingest the exported file into the artifact system to get proper download URL
+            # Create a temporary copy for artifact ingestion (since ingest_files deletes the original)
+            import tempfile
+            import shutil
+            temp_copy = tempfile.NamedTemporaryFile(delete=False, suffix=f"_{filename}")
+            shutil.copy2(host_path, temp_copy.name)
+            temp_copy.close()
+            
+            # Ingest the temporary copy into the artifact system to get proper download URL
             descriptors = ingest_files(
-                new_host_files=[host_path],
+                new_host_files=[Path(temp_copy.name)],
                 session_id=session_key,
                 run_id=None,
                 tool_call_id=None,
             )
             
+            # Clean up the temporary file (ingest_files already deleted it, but just to be safe)
+            try:
+                Path(temp_copy.name).unlink(missing_ok=True)
+            except:
+                pass
+            
             # Get the download URL from the artifact descriptor
-            download_url = ""
+            download_url = f"./exports/modified_datasets/{host_filename}"  # fallback
             if descriptors and len(descriptors) > 0:
                 artifact_desc = descriptors[0]
-                download_url = artifact_desc.get("url", f"file://{host_path.absolute()}")
-            else:
-                download_url = f"file://{host_path.absolute()}"
+                artifact_url = artifact_desc.get("url")
+                if artifact_url:
+                    download_url = artifact_url
             
             return {
                 "success": True,
