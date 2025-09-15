@@ -17,9 +17,9 @@ from src.datasets.startup import initialize_local_datasets
 from src.datasets.cache import clear_cache
 from src.config import Config
 from ex1_graph.local_ex_graph import get_builder
-from tools import set_session_id
+from ex1_graph.tools import set_session_id
+from ex1_graph.tools import extract_artifact_references
 from src.sandbox.container_utils import cleanup_sandbox_containers
-from tools import extract_artifact_references
 from src.artifacts.reader import fetch_artifact_urls
 
 if __name__ == "__main__":

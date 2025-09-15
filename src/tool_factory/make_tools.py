@@ -156,8 +156,13 @@ def make_export_datasets_tool(
     
     class ExportDatasetArgs(BaseModel):
         container_path: Annotated[str, Field(description="Path to file inside container (e.g., '/session/data/modified_data.parquet')")]
+        tool_call_id: Annotated[str, InjectedToolCallId]
+        model_config = ConfigDict(arbitrary_types_allowed=True)
     
-    def _impl(container_path: Annotated[str, "Path to file inside container (e.g., '/session/data/modified_data.parquet')"], call_id: InjectedToolCallId) -> Command:
+    def _impl(
+        container_path: Annotated[str, "Path to file inside container (e.g., '/session/data/modified_data.parquet')"], 
+        tool_call_id: Annotated[str, InjectedToolCallId]
+    ) -> Command:
         """Export a file from container to host filesystem."""
         session_key = session_key_fn()
         
@@ -172,12 +177,12 @@ def make_export_datasets_tool(
                     f"  Host path: {result['host_path']}\n"
                     f"  Download URL: {result['download_url']}"
                 ),
-                tool_call_id=call_id,
+                tool_call_id=tool_call_id,
             )
         else:
             tool_msg = ToolMessage(
                 content=f"Failed to export dataset: {result['error']}",
-                tool_call_id=call_id,
+                tool_call_id=tool_call_id,
             )
         
         return Command(update={"messages": [tool_msg]})
