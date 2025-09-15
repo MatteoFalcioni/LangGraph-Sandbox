@@ -37,9 +37,9 @@ Two independent knobs define runtime behavior:
 
 ### Recommended Defaults
 
-* **Simple code execution:** **TMPFS_NONE** - Perfect for general-purpose coding without datasets
-* **Production / multi‑tenant demos:** **TMPFS_API** - If datasets are huge & stable, prefer **TMPFS_LOCAL**
-* **Local dev/debug:** **BIND_LOCAL** - For persistent development with local datasets
+* **Simple code execution:** **TMPFS_NONE** - Perfect for general-purpose coding without datasets (see example)
+* **Production / multi‑tenant demos:** **TMPFS_API** (see example) - If datasets are huge & stable, prefer **TMPFS_LOCAL** 
+* **Local dev/debug:** **BIND_LOCAL** - For persistent development with local datasets (see example)
 
 ---
 

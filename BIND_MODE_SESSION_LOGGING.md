@@ -71,13 +71,13 @@ A utility script is provided to easily inspect session data:
 
 ```bash
 # View all session information
-python src/sandbox/session_viewer.py sessions/conv
+python src/sandbox/session_viewer.py sessions/<session_id>
 
 # View only last 10 log entries
-python src/sandbox/session_viewer.py sessions/conv --limit 10
+python src/sandbox/session_viewer.py sessions/<session_id> --limit 10
 
 # Skip Python state and artifacts display
-python src/sandbox/session_viewer.py sessions/conv --no-state --no-artifacts
+python src/sandbox/session_viewer.py sessions/<session_id> --no-state --no-artifacts
 ```
 
 ## Benefits for Debugging
@@ -114,7 +114,7 @@ sessions/conv/
 ├── session_metadata.json          # Session info and stats
 ├── python_state.json             # Current Python state
 └── artifacts/                    # Files created during execution
-    ├── hello.txt
+    ├── hello.txt                # these are automatically ingested and deleted after
     ├── plot.png
     └── data.csv
 ```

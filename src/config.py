@@ -32,6 +32,7 @@ class Config:
     datasets_host_ro: Optional[Path] = None       # required if DatasetAccess=LOCAL_RO
     blobstore_dir: Path = Path("./blobstore")
     artifacts_db_path: Path = Path("./artifacts.db")
+    cache_filename: str = "cache_datasets.txt"   # filename for dataset cache within session dir
 
     # --- docker bits / misc ---
     sandbox_image: str = "py-sandbox:latest"
@@ -155,6 +156,7 @@ class Config:
           - DATASETS_HOST_RO= ./example_llm_data     (required if LOCAL_RO)
           - BLOBSTORE_DIR   = ./blobstore
           - ARTIFACTS_DB    = ./artifacts.db
+          - CACHE_FILENAME  = cache_datasets.txt     (default: cache_datasets.txt)
           - SANDBOX_IMAGE   = py-sandbox:latest
           - TMPFS_SIZE_MB   = 1024
         """
@@ -170,6 +172,7 @@ class Config:
 
         blobstore_dir   = Path(cls._get_env_value("BLOBSTORE_DIR", "./blobstore", env_vars)).resolve()
         artifacts_db    = Path(cls._get_env_value("ARTIFACTS_DB", "./artifacts.db", env_vars)).resolve()
+        cache_filename  = cls._get_env_value("CACHE_FILENAME", "cache_datasets.txt", env_vars)
         sandbox_image   = cls._get_env_value("SANDBOX_IMAGE", "py-sandbox:latest", env_vars)
         tmpfs_size_mb   = int(cls._get_env_value("TMPFS_SIZE_MB", "1024", env_vars))
 
@@ -188,6 +191,7 @@ class Config:
             datasets_host_ro=datasets_host_ro,
             blobstore_dir=blobstore_dir,
             artifacts_db_path=artifacts_db,
+            cache_filename=cache_filename,
             sandbox_image=sandbox_image,
             tmpfs_size_mb=tmpfs_size_mb,
         )

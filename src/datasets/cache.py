@@ -7,15 +7,12 @@ from typing import Iterable, List
 from src.config import Config
 
 
-CACHE_FILENAME = "cache_datasets.txt"
-
-
 def cache_file_path(cfg: Config, session_id: str) -> Path:
     """
     Host-side path to the simple dataset cache list (one id per line).
-    Lives under ./sessions/<sid>/cache_datasets.txt **regardless of TMPFS/BIND**.
+    Lives under ./sessions/<sid>/<cache_filename> **regardless of TMPFS/BIND**.
     """
-    return cfg.session_dir(session_id) / CACHE_FILENAME
+    return cfg.session_dir(session_id) / cfg.cache_filename
 
 
 def read_ids(cfg: Config, session_id: str) -> List[str]:
