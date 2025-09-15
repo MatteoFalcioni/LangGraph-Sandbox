@@ -2,7 +2,7 @@
 FROM python:3.11-slim
 
 # libs available IN the sandbox (importable by user code)
-RUN pip install --no-cache-dir numpy pandas matplotlib geopandas pyarrow fastapi uvicorn
+RUN pip install --no-cache-dir numpy pandas matplotlib seaborn scikit-learn scikit-image geopandas shapely pyarrow scipy statsmodels fastapi uvicorn
 
 # non-root user
 RUN useradd -m -u 1000 sandbox
