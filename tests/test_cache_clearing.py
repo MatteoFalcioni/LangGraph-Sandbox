@@ -137,7 +137,7 @@ def test_clear_cache_returns_correct_path(tmp_path):
     expected_path = cache_file_path(cfg, sid)
     
     assert result_path == expected_path
-    assert result_path.name == "cache_datasets.txt"
+    assert result_path.name == "cache_datasets.json"
     assert result_path.parent.name == sid
 
 
