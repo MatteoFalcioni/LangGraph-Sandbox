@@ -13,7 +13,7 @@ from langchain_core.messages import ToolMessage
 from src.config import Config
 from src.sandbox.session_manager import SessionManager, DatasetAccess
 from src.datasets.sync import sync_datasets
-from src.datasets.cache import read_ids
+from src.datasets.cache import read_ids, read_pending_ids
 
 
 def _default_get_session_key() -> str:
@@ -69,11 +69,11 @@ def make_code_sandbox_tool(
             if fetch_fn is None:
                 raise ValueError("fetch_fn must be provided when using API dataset access")
 
-            # Read dataset IDs from session cache (created by select_datasets tool)
-            # Create a minimal config for read_ids
+            # Read PENDING dataset IDs from session cache (created by select_datasets tool)
+            # Create a minimal config for read_pending_ids
             from src.config import Config
             cfg = Config.from_env()
-            datasets = read_ids(cfg, sid)
+            datasets = read_pending_ids(cfg, sid)
             
             if datasets:
                 # Get container reference and sync datasets

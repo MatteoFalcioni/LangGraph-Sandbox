@@ -101,6 +101,15 @@ def read_ids(cfg: Config, session_id: str) -> List[str]:
     return [entry.id for entry in read_entries(cfg, session_id)]
 
 
+def read_pending_ids(cfg: Config, session_id: str) -> List[str]:
+    """
+    Return the list of dataset IDs with PENDING status (de-duplicated, in order).
+    This is used by the sync system to only stage datasets that need to be loaded.
+    """
+    entries = read_entries(cfg, session_id)
+    return [entry.id for entry in entries if entry.status == DatasetStatus.PENDING]
+
+
 def is_cached(cfg: Config, session_id: str, ds_id: str) -> bool:
     """True if ds_id is already listed in the cache file."""
     return ds_id in read_ids(cfg, session_id)

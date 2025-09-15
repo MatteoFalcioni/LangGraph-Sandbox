@@ -50,23 +50,79 @@ def stage_dataset_into_sandbox(
     fetch_fn = fetch_dataset,
 ) -> Dict[str, Optional[str]]:
     """
-    Stage a dataset into the sandbox according to current mode.
-    - If DATASET_ACCESS=API:
-        - TMPFS: push bytes into container:/session/data/<id>.parquet
-        - BIND:  write bytes to host ./sessions/<sid>/data/<id>.parquet (bind mount)
-    - If DATASET_ACCESS=LOCAL_RO:
-        - Do NOT fetch; dataset is assumed available at /data (RO mount).
-    - Always update the host-side cache list with ds_id (idempotent).
-    - If skip_if_cached=True and ds_id is already in cache, do nothing (early return).
+    Stage a dataset into the sandbox according to the current dataset access mode.
 
-    Returns a small descriptor:
-      {
-        "id": ds_id,
-        "path_in_container": "<container path to use>",
-        "mode": "<BIND_LOCAL|TMPFS_LOCAL|TMPFS_API|BIND_API>",
-        "staged": true|false,   # whether bytes were written by this call
-      }
+    This function ensures that the specified dataset is available in the sandbox
+    (container or host bind mount) for the current session, handling all supported
+    dataset access modes (API, LOCAL_RO) and storage backends (TMPFS, BIND).
+
+    Parameters
+    ----------
+    cfg : Config
+        The configuration object containing environment, path, and mode information.
+        Must provide access to mode flags (e.g., uses_api_staging, is_tmpfs), and
+        path templates for container and host data locations.
+
+    session_id : str
+        The unique identifier for the current session. Used to determine the correct
+        host-side directory for dataset staging and cache management.
+
+    container : object
+        Docker container handle. Required only if using TMPFS+API mode, where bytes
+        must be pushed directly into the running container's filesystem. In BIND or
+        LOCAL_RO modes, this parameter is ignored.
+
+    ds_id : str
+        The dataset identifier (typically a string, e.g., "temperatures" or a UUID).
+        Used to locate, fetch, and name the dataset file.
+
+    skip_if_cached : bool, optional (default=True)
+        If True, the function will check the host-side cache to see if the dataset
+        has already been staged for this session. If so, it will return immediately
+        without re-fetching or re-copying the dataset. If False, the dataset will
+        always be (re)staged, regardless of cache state.
+
+    fetch_fn : callable, optional (default=fetch_dataset)
+        Function to fetch the dataset bytes given a dataset id. Must have the signature
+        `fetch_fn(ds_id: str) -> bytes`. Used only in API modes. In LOCAL_RO mode,
+        this is ignored.
+
+    Returns
+    -------
+    dict
+        A descriptor dictionary with the following keys:
+            - "id": The dataset id (str)
+            - "path_in_container": The absolute path to the dataset file inside the container (str)
+            - "mode": A string describing the staging mode (e.g., "TMPFS_API", "BIND_API", "TMPFS_LOCAL", "BIND_LOCAL")
+            - "staged": True if the dataset was copied/staged during this call, False if already present
+
+    Notes
+    -----
+    - In API mode:
+        - TMPFS: The dataset is fetched and written directly into the container's /data directory.
+        - BIND:  The dataset is fetched and written to the host-side session directory, which is bind-mounted into the container.
+    - In LOCAL_RO mode:
+        - No fetching or copying is performed. The dataset is assumed to be available in the container's read-only /data mount.
+    - The function always updates the host-side cache list with ds_id (idempotent).
+    - If skip_if_cached=True and ds_id is already in cache, the function returns early and does not perform any I/O.
+    - The returned descriptor is suitable for tracking dataset provenance and for downstream use in code execution tools.
+
+    Raises
+    ------
+    Any exceptions raised by fetch_fn or I/O operations will propagate.
+
+    Examples
+    --------
+    >>> desc = stage_dataset_into_sandbox(
+    ...     cfg=my_cfg,
+    ...     session_id="abc123",
+    ...     container=my_container,
+    ...     ds_id="temperatures",
+    ... )
+    >>> print(desc["path_in_container"])
+    /data/temperatures.parquet
     """
+
     # Early exit if cached (even if TMPFS got wiped - should not happen since we have a session per convo)
     # but needs to implement session retrieved in previous convo - then becomes a problem
     if skip_if_cached and is_cached(cfg, session_id, ds_id):
@@ -98,13 +154,15 @@ def stage_dataset_into_sandbox(
             _atomic_write_bytes(dest, data)
             staged_now = True
 
-        # After successful stage, record in host cache
-        add_id(cfg, session_id, ds_id)
+        # After successful stage, record in host cache with LOADED status
+        from src.datasets.cache import update_entry_status, DatasetStatus
+        update_entry_status(cfg, session_id, ds_id, DatasetStatus.LOADED)
         path = container_staged_path(cfg, ds_id)
 
     else:
         # LOCAL_RO: nothing to fetch; just record intent for transparency
-        add_id(cfg, session_id, ds_id)
+        from src.datasets.cache import update_entry_status, DatasetStatus
+        update_entry_status(cfg, session_id, ds_id, DatasetStatus.LOADED)
         path = container_ro_path(cfg, ds_id)
 
     return {
