@@ -35,7 +35,7 @@ class Config:
     cache_filename: str = "cache_datasets.json"   # filename for dataset cache within session dir
 
     # --- docker bits / misc ---
-    sandbox_image: str = "py-sandbox:latest"
+    sandbox_image: str = "sandbox:latest"
     tmpfs_size_mb: int = 1024  # only used when SessionStorage=TMPFS
 
     # --- in-container canonical paths (do not change lightly) ---
@@ -157,7 +157,7 @@ class Config:
           - BLOBSTORE_DIR   = ./blobstore
           - ARTIFACTS_DB    = ./artifacts.db
           - CACHE_FILENAME  = cache_datasets.json     (default: cache_datasets.json)
-          - SANDBOX_IMAGE   = py-sandbox:latest
+          - SANDBOX_IMAGE   = sandbox:latest
           - TMPFS_SIZE_MB   = 1024
         """
         # Load environment variables from file if provided
@@ -173,7 +173,7 @@ class Config:
         blobstore_dir   = Path(cls._get_env_value("BLOBSTORE_DIR", "./blobstore", env_vars)).resolve()
         artifacts_db    = Path(cls._get_env_value("ARTIFACTS_DB", "./artifacts.db", env_vars)).resolve()
         cache_filename  = cls._get_env_value("CACHE_FILENAME", "cache_datasets.json", env_vars)
-        sandbox_image   = cls._get_env_value("SANDBOX_IMAGE", "py-sandbox:latest", env_vars)
+        sandbox_image   = cls._get_env_value("SANDBOX_IMAGE", "sandbox:latest", env_vars)
         tmpfs_size_mb   = int(cls._get_env_value("TMPFS_SIZE_MB", "1024", env_vars))
 
         # Basic validation

@@ -13,7 +13,7 @@ Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
-Requires-Python: >=3.10
+Requires-Python: >=3.11
 Description-Content-Type: text/markdown
 Requires-Dist: langgraph==0.6.7
 Requires-Dist: langgraph-checkpoint==2.1.0
@@ -97,32 +97,55 @@ The system offers six execution modes based on two independent configuration kno
 
 ## Quick Start
 
-### 1. Clone the repository and build the Docker Image
-
-   ```bash
-   git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
-   cd LangGraph-Sandbox
-   docker build -t py-sandbox:latest -f Dockerfile .
-   ```
-
-### 2. Install Dependencies
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### 3. Run Simple Example
+### Option 1: Python Package Installation (Recommended)
 
 ```bash
-# Simple code execution (no datasets)
-DATASET_ACCESS=NONE python main.py
+# Clone and install the package
+git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
+cd LangGraph-Sandbox
+pip install -e .
+
+# Build the Docker image
+docker build -t sandbox:latest -f Dockerfile .
 ```
 
-### 4. Set Your OpenAI API Key
+Set your OpenAI API key by modifying the `example.env` file, or set environment variable:
+
+```bash
+export OPENAI_API_KEY=your_api_key_here
+```
+
+And then you can run a simple example
+
+```bash
+# Run the simple sandbox
+langgraph-sandbox
+```
+
+### Option 2: Manual Installation
+
+```bash
+# Clone the repository and build the Docker Image
+git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
+cd LangGraph-Sandbox
+docker build -t sandbox:latest -f Dockerfile .
+
+# Install Dependencies
+pip install -r requirements.txt
+```
+
+Then set your OpenAI API key by modifying the `example.env` file, or set environment variable:
 
 Create a `.env` file or set environment variable:
 ```bash
 export OPENAI_API_KEY=your_api_key_here
+```
+
+And then you can run a simple example:
+
+```bash
+# Run Simple Example
+DATASET_ACCESS=NONE python main.py
 ```
 
 ## Configuration
@@ -147,7 +170,7 @@ ARTIFACTS_DB=./artifacts.db
 DATASETS_HOST_RO=./example_llm_data
 
 # Docker settings
-SANDBOX_IMAGE=py-sandbox:latest
+SANDBOX_IMAGE=sandbox:latest
 TMPFS_SIZE_MB=1024
 ```
 
@@ -282,21 +305,6 @@ The system provides two main tools:
 1. **`code_sandbox`**: Execute Python code with persistent state
 2. **`export_datasets`**: Export modified datasets to host filesystem
 
-## Installation
-
-### Prerequisites
-
-- Docker installed and running
-- Python 3.8+ 
-- OpenAI API key
-
-### Dependencies
-
-Core dependencies (see `requirements.txt`):
-- `langgraph` - Graph-based agent framework
-- `docker` - Container management
-- `fastapi` - Artifact API server
-- `pydantic` - Data validation
 
 ### Docker Image
 

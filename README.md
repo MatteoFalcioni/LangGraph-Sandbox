@@ -67,7 +67,7 @@ cd LangGraph-Sandbox
 pip install -e .
 
 # Build the Docker image
-docker build -t py-sandbox:latest -f Dockerfile .
+docker build -t sandbox:latest -f Dockerfile .
 ```
 
 Set your OpenAI API key by modifying the `example.env` file, or set environment variable:
@@ -89,7 +89,7 @@ langgraph-sandbox
 # Clone the repository and build the Docker Image
 git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
 cd LangGraph-Sandbox
-docker build -t py-sandbox:latest -f Dockerfile .
+docker build -t sandbox:latest -f Dockerfile .
 
 # Install Dependencies
 pip install -r requirements.txt
@@ -131,7 +131,7 @@ ARTIFACTS_DB=./artifacts.db
 DATASETS_HOST_RO=./example_llm_data
 
 # Docker settings
-SANDBOX_IMAGE=py-sandbox:latest
+SANDBOX_IMAGE=sandbox:latest
 TMPFS_SIZE_MB=1024
 ```
 

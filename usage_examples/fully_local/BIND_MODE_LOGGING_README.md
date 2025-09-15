@@ -35,7 +35,7 @@ Session configuration and statistics:
   "host_port": 9001,
   "session_storage": "BIND",
   "dataset_access": "API",
-  "image": "py-sandbox:latest",
+  "image": "sandbox:latest",
   "execution_count": 5,
   "stopped_at": "2024-01-15T10:35:00",
   "final_execution_count": 5
