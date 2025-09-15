@@ -77,16 +77,17 @@ async def select_dataset_tool(
     dataset_id: Annotated[str, "The dataset ID"],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-
-    with open(f"{FILENAME}", "wb") as f:
-        f.write(dataset_id)
-
+    from src.datasets.cache import add_entry
+    
+    # Add the dataset to cache with PENDING status
+    session_id = get_session_key()
+    cache_path = add_entry(cfg, session_id, dataset_id, status="pending")
+    
     return Command(
         update={
             "messages": [
                 ToolMessage(
-                    content=json.dumps(bytes, ensure_ascii=False),
-                    artifact=bytes,
+                    content=f"Dataset '{dataset_id}' added to cache with PENDING status. Cache written to: {cache_path}",
                     tool_call_id=tool_call_id,
                 )
             ]

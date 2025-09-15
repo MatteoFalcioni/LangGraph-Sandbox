@@ -15,7 +15,7 @@ from src.artifacts.api import router as artifacts_router
 
 from src.config import Config
 from ex3_graph.tmpfs_api_ex_graph import get_builder
-from ex3_graph.tools import set_session_id
+from ex3_graph.tools import set_session_id, client
 from src.sandbox.container_utils import cleanup_sandbox_containers
 from src.artifacts.reader import fetch_artifact_urls
 
@@ -77,6 +77,9 @@ if __name__ == "__main__":
         usr_msg = input("User: ")
 
         if "/bye" in usr_msg.lower():
+            # Close the API client
+            import asyncio
+            asyncio.run(client.close())
             break
 
         print(f"\n--- Thinking ... ---\n")

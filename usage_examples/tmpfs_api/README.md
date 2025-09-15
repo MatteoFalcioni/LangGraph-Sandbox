@@ -47,9 +47,11 @@ This example demonstrates how to use the LangGraph Sandbox in **TMPFS_API** mode
 Once running, try these commands:
 
 ```
+User: Search for datasets about air quality
+User: Select the "centraline_qualita_aria_2025" dataset
 User: What datasets are available in /data/?
-User: Fetch the weather dataset and create a temperature trend plot
-User: Load the stock market data and analyze correlations
+User: Load the air quality dataset and create a visualization
+User: Analyze the data and find correlations
 User: Create a new dataset by combining API data and export it
 User: Generate a machine learning model using the fetched data
 ```

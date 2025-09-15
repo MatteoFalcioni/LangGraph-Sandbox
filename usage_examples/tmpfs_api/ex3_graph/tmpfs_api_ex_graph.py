@@ -4,7 +4,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import InMemorySaver
 from dotenv import load_dotenv
-from ex3_graph.tools import code_exec_tool, export_datasets_tool
+from ex3_graph.tools import code_exec_tool, export_datasets_tool, list_catalog_tool, select_dataset_tool
 
 from ex3_graph.prompt import PROMPT
 
@@ -14,7 +14,7 @@ llm = ChatOpenAI(model="gpt-4.1")
 
 coding_agent = create_react_agent(
     model=llm,
-    tools=[code_exec_tool, export_datasets_tool],
+    tools=[code_exec_tool, export_datasets_tool, list_catalog_tool, select_dataset_tool],
     prompt=PROMPT
 )
 

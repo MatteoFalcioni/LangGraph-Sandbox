@@ -1,7 +1,7 @@
-from client import BolognaOpenData
+from .client import BolognaOpenData
 from typing import Any, Dict, List, Optional
 import re, html
-import Path
+from pathlib import Path
 
 # --------------
 # list datasets
@@ -36,7 +36,7 @@ async def list_catalog(
 # ----------------
 # export dataset as parquet
 # ----------------
-async def get_dataset_bytes(client, dataset_id: str) -> bytes:
+async def get_dataset_bytes(client: BolognaOpenData, dataset_id: str) -> bytes:
     try:
         # Export dataset as parquet bytes
         parquet_bytes = await client.export(dataset_id, "parquet")
@@ -45,3 +45,4 @@ async def get_dataset_bytes(client, dataset_id: str) -> bytes:
         
     except Exception as e:
         print(f"Error exporting dataset: {e}")
+        raise
