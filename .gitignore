@@ -9,3 +9,5 @@ docker.env
 *.db
 *blobstore*
 exports/
+build/
+dist/

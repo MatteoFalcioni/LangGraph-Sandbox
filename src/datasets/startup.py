@@ -13,8 +13,8 @@ if __name__ == "__main__":
     project_root = Path(__file__).parent.parent.parent
     sys.path.insert(0, str(project_root))
 
-from src.config import Config, DatasetAccess
-from src.datasets.cache import write_ids
+from config import Config, DatasetAccess
+from datasets.cache import write_ids
 
 
 def discover_local_datasets(cfg: Config) -> List[str]:
@@ -99,7 +99,7 @@ def get_available_datasets(cfg: Config, session_id: str = "global") -> List[str]
         return discover_local_datasets(cfg)
     else:
         # For API, return cached datasets (populated by select_datasets)
-        from src.datasets.cache import read_ids
+        from datasets.cache import read_ids
         return read_ids(cfg, session_id)
 
 

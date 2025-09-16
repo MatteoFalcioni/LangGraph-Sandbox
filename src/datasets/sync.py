@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from typing import Dict, List
-from src.config import Config
-from src.datasets.staging import stage_dataset_into_sandbox, container_staged_path, container_ro_path
-from src.datasets.cache import DatasetStatus, update_entry_status
+from config import Config
+from datasets.staging import stage_dataset_into_sandbox, container_staged_path, container_ro_path
+from datasets.cache import DatasetStatus, update_entry_status
 
 async def load_pending_datasets(
     *,

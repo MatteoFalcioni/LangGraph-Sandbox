@@ -1,6 +1,6 @@
 # src/datasets/selector.py
-from src.config import Config
-from src.datasets.cache import write_ids
+from config import Config
+from datasets.cache import write_ids
 
 
 def select_datasets(cfg: Config, session_id: str) -> list[str]:

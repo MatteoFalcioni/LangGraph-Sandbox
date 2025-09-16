@@ -25,8 +25,8 @@ setup(
     description="A sandbox environment for LangGraph with artifact storage and dataset management",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=find_packages(),
-    py_modules=["main"],
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     python_requires=">=3.11",
     install_requires=requirements,
     extras_require={
@@ -52,10 +52,11 @@ setup(
     entry_points={
         "console_scripts": [
             "langgraph-sandbox=main:main",
+            "langgraph-sandbox-setup=setup:main",
         ],
     },
     include_package_data=True,
     package_data={
-        "": ["*.env", "*.txt", "*.md"],
+        "src.setup": ["*.env", "Dockerfile"],
     },
 )

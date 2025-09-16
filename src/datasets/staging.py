@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Optional
 
-from src.config import Config
-from src.sandbox.io import put_bytes
-from src.datasets.fetcher import fetch_dataset
+from config import Config
+from sandbox.io import put_bytes
+from datasets.fetcher import fetch_dataset
 
 
 def _atomic_write_bytes(path: Path, data: bytes) -> None:

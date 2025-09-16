@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
-from src.config import Config
+from config import Config
 
 
 class DatasetStatus:

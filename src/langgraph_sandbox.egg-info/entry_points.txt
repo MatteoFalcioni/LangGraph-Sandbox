@@ -1,0 +1,3 @@
+[console_scripts]
+langgraph-sandbox = main:main
+langgraph-sandbox-setup = setup:main

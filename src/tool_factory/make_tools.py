@@ -10,8 +10,7 @@ from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 
-from src.config import Config
-from src.sandbox.session_manager import SessionManager
+from sandbox.session_manager import SessionManager
 
 
 def _default_get_session_key() -> str:
@@ -135,9 +134,9 @@ def make_select_dataset_tool(
         tool_call_id: Annotated[str, InjectedToolCallId]
     ) -> Command:
         """Select and load a dataset into the sandbox."""
-        from src.config import Config
-        from src.datasets.cache import DatasetStatus, add_entry
-        from src.datasets.sync import load_pending_datasets
+        from config import Config
+        from datasets.cache import DatasetStatus, add_entry
+        from datasets.sync import load_pending_datasets
         
         # Load configuration
         cfg = Config.from_env()

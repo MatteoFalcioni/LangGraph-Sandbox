@@ -1,3 +1,41 @@
+Metadata-Version: 2.4
+Name: langgraph-sandbox
+Version: 0.1.0
+Summary: A sandbox environment for LangGraph with artifact storage and dataset management
+Author: Matteo Falcioni
+License-Expression: MIT
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: langgraph==0.6.7
+Requires-Dist: langgraph-checkpoint==2.1.0
+Requires-Dist: langchain-core==0.3.75
+Requires-Dist: langchain-community==0.3.29
+Requires-Dist: langchain-openai==0.3.32
+Requires-Dist: openai==1.106.1
+Requires-Dist: pydantic==2.11.7
+Requires-Dist: typing_extensions>=4.10
+Requires-Dist: python-dotenv==1.1.1
+Requires-Dist: docker==7.1.0
+Requires-Dist: fastapi==0.116.1
+Requires-Dist: uvicorn==0.35.0
+Requires-Dist: orjson==3.10.18
+Requires-Dist: httpx
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Dynamic: requires-python
+
 # LangGraph Sandbox – Docker-Based Code Execution Environment
 
 A production-ready Docker sandbox for executing Python code within LangGraph agentic systems. Provides secure, isolated code execution with persistent state, dataset management, and automatic artifact storage.
@@ -67,11 +105,6 @@ The system offers six execution modes based on two independent configuration kno
 # Clone and install the package
 git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
 cd LangGraph-Sandbox
-
-# Ensure you have Python >= 3.11
-python --version  # Should show Python 3.11.x or higher
-
-# Install the package in development mode
 pip install -e .
 
 # Build the Docker image
@@ -104,14 +137,7 @@ from src import make_code_sandbox_tool, SessionManager, Config
 
 # Load configuration
 config = Config.from_env()
-session_manager = SessionManager(
-    image=config.sandbox_image,
-    session_storage=config.session_storage,
-    dataset_access=config.dataset_access,
-    datasets_path=config.datasets_host_ro,
-    session_root=config.sessions_root,
-    tmpfs_size=config.tmpfs_size_mb,
-)
+session_manager = SessionManager(config=config)
 
 # Create tools
 code_tool = make_code_sandbox_tool(
@@ -145,10 +171,6 @@ python main.py
 
 ### Installation
 
-**Requirements:**
-- Python >= 3.11
-- Docker installed and running
-
 ```bash
 # Install in development mode (recommended for local development)
 pip install -e /path/to/LangGraph-Sandbox
@@ -156,10 +178,6 @@ pip install -e /path/to/LangGraph-Sandbox
 # Or install from built package
 pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
 ```
-
-**Note:** After installation, the package modules are available as top-level imports:
-- `from src import make_code_sandbox_tool, SessionManager, Config`
-- `import tool_factory`, `import sandbox`, `import artifacts`, `import datasets`
 
 ### Setup Docker Environment
 
@@ -204,14 +222,7 @@ from src import (
 config = Config.from_env()
 
 # Create session manager
-session_manager = SessionManager(
-    image=config.sandbox_image,
-    session_storage=config.session_storage,
-    dataset_access=config.dataset_access,
-    datasets_path=config.datasets_host_ro,
-    session_root=config.sessions_root,
-    tmpfs_size=config.tmpfs_size_mb,
-)
+session_manager = SessionManager(config=config)
 
 # Create tools
 code_tool = make_code_sandbox_tool(
@@ -306,26 +317,24 @@ python main.py
 
 ## Usage Examples
 
-The repository includes three complete examples demonstrating different modes. **Run all examples from the project root directory:**
+The repository includes three complete examples demonstrating different modes:
 
 ### Simple Sandbox (TMPFS_NONE)
 ```bash
-# From project root - recommended approach
-langgraph-sandbox
-# or
-python main.py
-
-# Alternative: run directly from example directory
 cd usage_examples/simple_sandbox
 python main.py
 ```
+or simply (this is the default example)
+```bash
+langgraph-sandbox
+``` 
+
 - No datasets, pure code execution
 - Perfect for algorithms and calculations
 - Everything runs in memory
 
 ### Fully Local (BIND_LOCAL)
 ```bash
-# From project root
 cd usage_examples/fully_local
 python main.py
 ```
@@ -335,7 +344,6 @@ python main.py
 
 ### TMPFS API (TMPFS_API)
 ```bash
-# From project root
 cd usage_examples/tmpfs_api
 python main.py
 ```
@@ -490,12 +498,6 @@ The sandbox runs in a custom Docker image with:
 
 ### Common Issues
 
-**Import errors (`ModuleNotFoundError`):**
-- Ensure you have Python >= 3.11: `python --version`
-- Install in the correct environment: `pip install -e .`
-- If using conda, activate the correct environment first
-- For usage examples, run from project root: `python main.py` or `langgraph-sandbox`
-
 **Container startup failures:**
 - Ensure Docker is running
 - Check `SANDBOX_IMAGE` points to correct image
@@ -510,11 +512,6 @@ The sandbox runs in a custom Docker image with:
 - Check artifact server is running (port 8000)
 - Verify token hasn't expired
 - Ensure artifact ID is correct
-
-**Usage example failures:**
-- Examples must be run from the project root directory
-- Use `python main.py` or `langgraph-sandbox` commands
-- Do not run examples directly from their subdirectories
 
 ## Next Steps
 
