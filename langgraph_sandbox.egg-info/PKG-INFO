@@ -3,10 +3,9 @@ Name: langgraph-sandbox
 Version: 0.1.0
 Summary: A sandbox environment for LangGraph with artifact storage and dataset management
 Author: Matteo Falcioni
-License: MIT
+License-Expression: MIT
 Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Developers
-Classifier: License :: OSI Approved :: MIT License
 Classifier: Programming Language :: Python :: 3
 Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
@@ -47,8 +46,10 @@ A production-ready Docker sandbox for executing Python code within LangGraph age
 - [Key Features](#key-features)
 - [Execution Modes](#execution-modes)
 - [Quick Start](#quick-start)
+- [Using as a Package in Other Projects](#using-as-a-package-in-other-projects)
 - [Configuration](#configuration)
 - [Usage Examples](#usage-examples)
+- [Tool Factory](#tool-factory)
 - [Artifact System](#artifact-system)
 - [Session Management](#session-management)
 - [Development & Debugging](#development--debugging)
@@ -99,27 +100,65 @@ The system offers six execution modes based on two independent configuration kno
 
 ### Option 1: Python Package Installation (Recommended)
 
+#### For Development/Testing:
 ```bash
 # Clone and install the package
 git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
 cd LangGraph-Sandbox
+
+# Ensure you have Python >= 3.11
+python --version  # Should show Python 3.11.x or higher
+
+# Install the package in development mode
 pip install -e .
 
 # Build the Docker image
 docker build -t sandbox:latest -f Dockerfile .
 ```
 
-Set your OpenAI API key by modifying the `example.env` file, or set environment variable:
-
-```bash
-export OPENAI_API_KEY=your_api_key_here
-```
-
-And then you can run a simple example
+Set your OpenAI API key by modifying the [`simple_sandbox.env`](usage_examples\simple_sandbox\simple_sandbox.env) file, and run the example:
 
 ```bash
 # Run the simple sandbox
-langgraph-sandbox
+python langgraph_sandbox/main.py
+```
+
+#### For Using in Other Projects:
+```bash
+# Install the package (development mode)
+pip install -e /path/to/LangGraph-Sandbox
+
+# Or install from built package
+pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
+
+# Run setup to build Docker image and create configuration
+python langgraph_sandbox/setup/__init__.py
+```
+
+Then customize your `.env` file and use in your code:
+
+```python
+from langgraph_sandbox import make_code_sandbox_tool, SessionManager, Config
+
+# Load configuration
+config = Config.from_env()
+session_manager = SessionManager(
+    image=config.sandbox_image,
+    session_storage=config.session_storage,
+    dataset_access=config.dataset_access,
+    datasets_path=config.datasets_host_ro,
+    session_root=config.sessions_root,
+    tmpfs_size=config.tmpfs_size_mb,
+)
+
+# Create tools with a session key function
+def get_session_key():
+    return "my_unique_session_id"  # Use your own session management key if needed for UI (otherwise defaults to convo)
+
+code_tool = make_code_sandbox_tool(
+    session_manager=session_manager,
+    session_key_fn=get_session_key
+)
 ```
 
 ### Option 2: Manual Installation
@@ -134,19 +173,133 @@ docker build -t sandbox:latest -f Dockerfile .
 pip install -r requirements.txt
 ```
 
-Then set your OpenAI API key by modifying the `example.env` file, or set environment variable:
-
-Create a `.env` file or set environment variable:
-```bash
-export OPENAI_API_KEY=your_api_key_here
-```
-
-And then you can run a simple example:
+Then set your OpenAI API key by modifying the [`simple_sandbox.env`](usage_examples\simple_sandbox\simple_sandbox.env) file and run a simple example:
 
 ```bash
 # Run Simple Example
-DATASET_ACCESS=NONE python main.py
+python main.py
 ```
+
+## Using as a Package in Other Projects
+
+### Installation
+
+**Requirements:**
+- Python >= 3.11
+- Docker installed and running
+
+```bash
+# Install in development mode (recommended for local development)
+pip install -e /path/to/LangGraph-Sandbox
+
+# Or install from built package
+pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
+```
+
+**Note:** After installation, the package modules are available as top-level imports:
+- `from langgraph_sandbox import make_code_sandbox_tool, SessionManager, Config`
+- `import langgraph_sandbox.tool_factory`, `import langgraph_sandbox.sandbox`, `import langgraph_sandbox.artifacts`, `import langgraph_sandbox.datasets`
+
+**Usage Examples:** The package includes complete usage examples that are installed with the package. You can find them in your Python environment or use them as templates for your own projects.
+
+### Setup Docker Environment
+
+After installation, run the setup command to build the Docker image and create configuration files:
+
+```bash
+langgraph-sandbox-setup
+```
+
+This command will:
+- Copy Docker files (`Dockerfile`, `example.env`, `docker.env`) to your project directory
+- Create a `.env` file from `example.env`
+- Build the Docker image (`sandbox:latest`)
+
+### Customize Configuration
+
+Edit the `.env` file to customize your setup:
+
+```bash
+nano .env
+```
+
+Key settings you might want to change:
+- `SESSION_STORAGE`: `TMPFS` (default) or `BIND`
+- `DATASET_ACCESS`: `API`, `LOCAL_RO`, or `API_TMPFS`
+- `SESSIONS_ROOT`: Directory for session storage
+- `SANDBOX_IMAGE`: Docker image name (default: `sandbox:latest`)
+- `TMPFS_SIZE_MB`: Size of tmpfs mount (default: 1024)
+
+### Usage in Your Code
+
+```python
+from langgraph_sandbox import (
+    make_code_sandbox_tool,
+    make_select_dataset_tool,
+    make_export_datasets_tool,
+    SessionManager,
+    Config
+)
+
+# Load configuration
+config = Config.from_env()
+
+# Create session manager
+session_manager = SessionManager(
+    image=config.sandbox_image,
+    session_storage=config.session_storage,
+    dataset_access=config.dataset_access,
+    datasets_path=config.datasets_host_ro,
+    session_root=config.sessions_root,
+    tmpfs_size=config.tmpfs_size_mb,
+)
+
+# Create tools with a session key function
+def get_session_key():
+    return "my_unique_session_id"  # Use your own session management
+
+code_tool = make_code_sandbox_tool(
+    session_manager=session_manager,
+    session_key_fn=get_session_key,
+    timeout_s=60
+)
+
+# Custom dataset fetching function
+def my_fetch_function(dataset_id: str) -> bytes:
+    # Your custom logic to fetch dataset
+    return dataset_bytes
+
+dataset_tool = make_select_dataset_tool(
+    session_manager=session_manager,
+    fetch_fn=my_fetch_function
+)
+
+# Use in your LangGraph workflow
+# ... your code here
+```
+
+### Project Structure After Setup
+
+```
+your-project/
+├── .env                    # Your configuration
+├── Dockerfile             # Copied from package
+├── example.env            # Template (copied from package)
+├── docker.env             # Alternative config (copied from package)
+├── your_code.py           # Your Python code
+└── ...
+```
+
+### Custom Docker Image
+
+To use a custom Docker image:
+
+1. Modify the Dockerfile in your project directory
+2. Update the `SANDBOX_IMAGE` in your `.env` file
+3. Rebuild the image:
+   ```bash
+   docker build -t your-custom-image:latest .
+   ```
 
 ## Configuration
 
@@ -177,13 +330,17 @@ TMPFS_SIZE_MB=1024
 ### Quick Configuration Examples
 
 **Simple execution:**
+
+In `.env`, set `DATASET_ACCESS=NONE`, then:
 ```bash
-DATASET_ACCESS=NONE python main.py
+python main.py
 ```
 
 **Local development:**
+
+In `.env`, set `SESSION_STORAGE=BIND`, `DATASET_ACCESS=LOCAL_RO` and `DATASETS_HOST_RO=./`, then:
 ```bash
-SESSION_STORAGE=BIND DATASET_ACCESS=LOCAL_RO DATASETS_HOST_RO=./data python main.py
+data python main.py
 ```
 
 **Production (default):**
@@ -193,10 +350,14 @@ python main.py
 
 ## Usage Examples
 
-The repository includes three complete examples demonstrating different modes:
+The repository includes three complete examples demonstrating different modes. **Run all examples from the project root directory:**
 
 ### Simple Sandbox (TMPFS_NONE)
 ```bash
+# From project root - recommended approach
+python langgraph_sandbox/main.py
+
+# Alternative: run directly from example directory
 cd usage_examples/simple_sandbox
 python main.py
 ```
@@ -206,6 +367,7 @@ python main.py
 
 ### Fully Local (BIND_LOCAL)
 ```bash
+# From project root
 cd usage_examples/fully_local
 python main.py
 ```
@@ -215,12 +377,58 @@ python main.py
 
 ### TMPFS API (TMPFS_API)
 ```bash
+# From project root
 cd usage_examples/tmpfs_api
 python main.py
 ```
 - Dynamic dataset fetching via API
 - Memory-based caching
 - Multi-tenant ready
+
+## Tool Factory 
+
+The system provides **production-ready LangGraph tools** out of the box through simple factory functions. These tools handle all the complexity of container management, session persistence, and artifact processing automatically.
+
+### 🚀 **Ready-to-Use Tools**
+
+**`make_code_sandbox_tool`** - Execute Python code with persistent state
+- Maintains variables and imports across executions
+- Automatic artifact detection and ingestion
+- Memory cleanup to prevent container bloat
+- Session-pinned containers for consistency
+
+**`make_select_dataset_tool`** - Load datasets on-demand (**only in API mode**)
+- Fetches datasets from your API sources
+- Stages them directly into the sandbox
+- Smart caching with PENDING/LOADED/FAILED status tracking
+- Client wrapper pattern for easy integration
+
+**`make_export_datasets_tool`** - Export modified datasets to host filesystem
+- Timestamped exports to prevent overwrites
+- Automatic artifact ingestion for download URLs
+- Works with any file in `/session/data/`
+
+Instead of writing custom tool implementations, you get:
+- **Zero boilerplate**: Just call the factory with your dependencies
+- **Battle-tested**: Handles edge cases, timeouts, and error recovery
+- **Consistent**: Same patterns across all your LangGraph applications
+- **Extensible**: Easy to customize with your own fetch functions and clients
+
+```python
+# Example: Create tools in 3 lines
+def get_session_key():
+    return "my_session_id"  # Implement your session management logic
+
+code_tool = make_code_sandbox_tool(session_manager=sm, session_key_fn=get_session_key)
+dataset_tool = make_select_dataset_tool(session_manager=sm, fetch_fn=my_fetch, client=my_client)
+export_tool = make_export_datasets_tool(session_manager=sm, session_key_fn=get_session_key)
+```
+
+> **Session Key Management:** The `session_key_fn` parameter is crucial for maintaining session isolation. Each unique session key gets its own container, so implement proper session management in your application (e.g., user ID, conversation ID, or thread ID). 
+
+> **Note:** Notice that the `make_select_dataset_tool` expects the `fetch_fn` parameter to be a function that, given your dataset_id, returns the dataset **bytes** through your API client. 
+>
+> If in your implementation you need to pass your API `client` to the `select_dataset` tool (as we did in our [custom example](usage_examples\tmpfs_api\ex3_graph\tools.py)), you can do so by simply specifing the `client` as an input parameter. It will be automatically wrapped without any needed changes. 
 
 ## Artifact System
 
@@ -275,19 +483,19 @@ sessions/<session_id>/
 ├── session.log                    # Complete execution history
 ├── session_metadata.json          # Session info and statistics
 ├── python_state.json             # Current Python state snapshot
-└── artifacts/                    # Files before ingestion
+└── artifacts/                    # Ingested at runtime
 ```
 
 #### Session Viewer Tool
 ```bash
 # View complete session information
-python src/sandbox/session_viewer.py sessions/<session_id>
+python langgraph_sandbox/sandbox/session_viewer.py sessions/<session_id>
 
 # View last 10 log entries
-python src/sandbox/session_viewer.py sessions/<session_id> --limit 10
+python langgraph_sandbox/sandbox/session_viewer.py sessions/<session_id> --limit 10
 
 # Skip state and artifacts display
-python src/sandbox/session_viewer.py sessions/<session_id> --no-state --no-artifacts
+python langgraph_sandbox/sandbox/session_viewer.py sessions/<session_id> --no-state --no-artifacts
 ```
 
 #### Debugging Benefits
@@ -297,13 +505,6 @@ python src/sandbox/session_viewer.py sessions/<session_id> --no-state --no-artif
 - **Artifact tracking**: Monitor file creation and processing
 - **Container information**: Track container lifecycle and configuration
 - **Performance analysis**: Execution timing and resource usage
-
-### Available Tools
-
-The system provides two main tools:
-
-1. **`code_sandbox`**: Execute Python code with persistent state
-2. **`export_datasets`**: Export modified datasets to host filesystem
 
 
 ### Docker Image
@@ -331,9 +532,16 @@ The sandbox runs in a custom Docker image with:
 - `SessionManager.start(session_id)` - Start new session
 - `SessionManager.exec(session_id, code)` - Execute code
 - `SessionManager.stop(session_id)` - Stop session
+
 ## Troubleshooting
 
 ### Common Issues
+
+**Import errors (`ModuleNotFoundError`):**
+- Ensure you have Python >= 3.11: `python --version`
+- Install in the correct environment: `pip install -e .`
+- If using conda, activate the correct environment first
+- For usage examples, run from project root: `python langgraph_sandbox/main.py`
 
 **Container startup failures:**
 - Ensure Docker is running
@@ -349,6 +557,11 @@ The sandbox runs in a custom Docker image with:
 - Check artifact server is running (port 8000)
 - Verify token hasn't expired
 - Ensure artifact ID is correct
+
+**Usage example failures:**
+- Examples must be run from the project root directory
+- Use `python langgraph_sandbox/main.py` command
+- Do not run examples directly from their subdirectories
 
 ## Next Steps
 

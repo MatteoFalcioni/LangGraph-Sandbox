@@ -19,7 +19,7 @@ from typing import Dict
 
 
 def _project_root() -> Path:
-    # .../project/src/artifacts/store.py  -> project/
+    # .../project/langgraph_sandbox/artifacts/store.py  -> project/
     return Path(__file__).resolve().parents[2]
 
 

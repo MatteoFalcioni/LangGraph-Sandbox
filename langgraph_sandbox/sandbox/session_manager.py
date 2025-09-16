@@ -1,5 +1,5 @@
 # ---------------------------
-# src/session_manager.py
+# langgraph_sandbox/sandbox/session_manager.py
 # ---------------------------
 
 import time
@@ -18,8 +18,14 @@ import io
 import tarfile
 import tempfile
 
-from ..artifacts.ingest import ingest_files
-from .container_utils import cleanup_sandbox_containers
+try:
+    # Try relative imports first (when used as a module)
+    from ..artifacts.ingest import ingest_files
+    from .container_utils import cleanup_sandbox_containers
+except ImportError:
+    # Fall back to absolute imports (when run directly)
+    from artifacts.ingest import ingest_files
+    from sandbox.container_utils import cleanup_sandbox_containers
 
 from enum import Enum
 

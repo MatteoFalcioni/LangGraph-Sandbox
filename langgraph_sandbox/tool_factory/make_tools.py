@@ -1,4 +1,4 @@
-# src/tools/factory.py
+# langgraph_sandbox/tool_factory/make_tools.py
 from __future__ import annotations
 
 import json
@@ -10,7 +10,12 @@ from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 
-from ..sandbox.session_manager import SessionManager
+try:
+    # Try relative imports first (when used as a module)
+    from ..sandbox.session_manager import SessionManager
+except ImportError:
+    # Fall back to absolute imports (when run directly)
+    from sandbox.session_manager import SessionManager
 
 
 def _default_get_session_key() -> str:
@@ -134,7 +139,10 @@ def make_select_dataset_tool(
         tool_call_id: Annotated[str, InjectedToolCallId]
     ) -> Command:
         """Select and load a dataset into the sandbox."""
-        from config import Config
+        try:
+            from ..config import Config
+        except ImportError:
+            from config import Config
         from datasets.cache import DatasetStatus, add_entry
         from datasets.sync import load_pending_datasets
         

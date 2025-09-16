@@ -3,8 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Optional
 
-from config import Config
-from ..sandbox.io import put_bytes
+try:
+    # Try relative imports first (when used as a module)
+    from ..config import Config
+    from ..sandbox.io import put_bytes
+except ImportError:
+    # Fall back to absolute imports (when run directly)
+    from config import Config
+    from sandbox.io import put_bytes
 from .fetcher import fetch_dataset
 
 

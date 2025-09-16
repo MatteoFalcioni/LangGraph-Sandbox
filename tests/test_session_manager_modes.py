@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from src.sandbox.session_manager import (
+from langgraph_sandbox.sandbox.session_manager import (
     SessionManager, SessionStorage, DatasetAccess
 )
 

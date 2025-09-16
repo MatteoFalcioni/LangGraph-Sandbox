@@ -4,10 +4,10 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.artifacts.store import ensure_artifact_store
-from src.artifacts.ingest import ingest_files
-from src.artifacts.api import router as artifacts_router
-from src.artifacts.tokens import create_token
+from langgraph_sandbox.artifacts.store import ensure_artifact_store
+from langgraph_sandbox.artifacts.ingest import ingest_files
+from langgraph_sandbox.artifacts.api import router as artifacts_router
+from langgraph_sandbox.artifacts.tokens import create_token
 
 def make_app() -> FastAPI:
     app = FastAPI()

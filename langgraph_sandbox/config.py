@@ -1,4 +1,4 @@
-# src/config.py
+# langgraph_sandbox/config.py
 from __future__ import annotations
 
 import os
@@ -198,5 +198,5 @@ class Config:
 
 if __name__ == "__main__":
     # Load once at startup
-    from src.config import Config
+    from langgraph_sandbox.config import Config
     CFG = Config.from_env()

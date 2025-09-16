@@ -1,4 +1,4 @@
-# src/__init__.py
+# langgraph_sandbox/__init__.py
 
 from .tool_factory import (
     make_code_sandbox_tool,

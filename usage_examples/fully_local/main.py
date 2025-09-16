@@ -16,17 +16,17 @@ from dotenv import load_dotenv
 import uuid
 
 from fastapi import FastAPI
-from src.artifacts.store import ensure_artifact_store
-from src.artifacts.api import router as artifacts_router
-from src.datasets.startup import initialize_local_datasets
+from langgraph_sandbox.artifacts.store import ensure_artifact_store
+from langgraph_sandbox.artifacts.api import router as artifacts_router
+from langgraph_sandbox.datasets.startup import initialize_local_datasets
 
-from src.datasets.cache import clear_cache
-from src.config import Config
+from langgraph_sandbox.datasets.cache import clear_cache
+from langgraph_sandbox.config import Config
 from ex1_graph.local_ex_graph import get_builder
 from ex1_graph.tools import set_session_id
 from ex1_graph.tools import extract_artifact_references
-from src.sandbox.container_utils import cleanup_sandbox_containers
-from src.artifacts.reader import fetch_artifact_urls
+from langgraph_sandbox.sandbox.container_utils import cleanup_sandbox_containers
+from langgraph_sandbox.artifacts.reader import fetch_artifact_urls
 
 if __name__ == "__main__":
 

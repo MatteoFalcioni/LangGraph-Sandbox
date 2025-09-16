@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.artifacts.tokens import create_token, verify_token, create_download_url
+from langgraph_sandbox.artifacts.tokens import create_token, verify_token, create_download_url
 
 
 def test_artifact_token_secret_auto_generated():

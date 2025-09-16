@@ -7,8 +7,8 @@ It provides a simple interactive sandbox for code execution.
 
 Usage:
     langgraph-sandbox                    # Run interactive sandbox
-    python src/main.py                   # Run interactive sandbox
-    python src/main.py --help            # Show help
+    python langgraph_sandbox/main.py                   # Run interactive sandbox
+    python langgraph_sandbox/main.py --help            # Show help
 """
 
 from cmd import PROMPT
@@ -24,11 +24,20 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 import uvicorn
 
-from artifacts.store import ensure_artifact_store
-from artifacts.api import router as artifacts_router
-from config import Config
-from sandbox.container_utils import cleanup_sandbox_containers
-from artifacts.reader import fetch_artifact_urls
+try:
+    # Try relative imports first (when used as a module)
+    from .artifacts.store import ensure_artifact_store
+    from .artifacts.api import router as artifacts_router
+    from .config import Config
+    from .sandbox.container_utils import cleanup_sandbox_containers
+    from .artifacts.reader import fetch_artifact_urls
+except ImportError:
+    # Fall back to absolute imports (when run directly)
+    from artifacts.store import ensure_artifact_store
+    from artifacts.api import router as artifacts_router
+    from config import Config
+    from sandbox.container_utils import cleanup_sandbox_containers
+    from artifacts.reader import fetch_artifact_urls
 
 def main():
     """Main entry point for the LangGraph Sandbox."""

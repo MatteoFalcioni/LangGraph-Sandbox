@@ -1,4 +1,4 @@
-# src/artifacts/api.py
+# langgraph_sandbox/artifacts/api.py
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse

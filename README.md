@@ -82,7 +82,7 @@ Set your OpenAI API key by modifying the [`simple_sandbox.env`](usage_examples\s
 
 ```bash
 # Run the simple sandbox
-python src/main.py
+python langgraph_sandbox/main.py
 ```
 
 #### For Using in Other Projects:
@@ -94,13 +94,13 @@ pip install -e /path/to/LangGraph-Sandbox
 pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
 
 # Run setup to build Docker image and create configuration
-python src/setup/__init__.py
+python langgraph_sandbox/setup/__init__.py
 ```
 
 Then customize your `.env` file and use in your code:
 
 ```python
-from src import make_code_sandbox_tool, SessionManager, Config
+from langgraph_sandbox import make_code_sandbox_tool, SessionManager, Config
 
 # Load configuration
 config = Config.from_env()
@@ -159,8 +159,8 @@ pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
 ```
 
 **Note:** After installation, the package modules are available as top-level imports:
-- `from src import make_code_sandbox_tool, SessionManager, Config`
-- `import tool_factory`, `import sandbox`, `import artifacts`, `import datasets`
+- `from langgraph_sandbox import make_code_sandbox_tool, SessionManager, Config`
+- `import langgraph_sandbox.tool_factory`, `import langgraph_sandbox.sandbox`, `import langgraph_sandbox.artifacts`, `import langgraph_sandbox.datasets`
 
 **Usage Examples:** The package includes complete usage examples that are installed with the package. You can find them in your Python environment or use them as templates for your own projects.
 
@@ -195,7 +195,7 @@ Key settings you might want to change:
 ### Usage in Your Code
 
 ```python
-from src import (
+from langgraph_sandbox import (
     make_code_sandbox_tool,
     make_select_dataset_tool,
     make_export_datasets_tool,
@@ -317,7 +317,7 @@ The repository includes three complete examples demonstrating different modes. *
 ### Simple Sandbox (TMPFS_NONE)
 ```bash
 # From project root - recommended approach
-python src/main.py
+python langgraph_sandbox/main.py
 
 # Alternative: run directly from example directory
 cd usage_examples/simple_sandbox
@@ -451,13 +451,13 @@ sessions/<session_id>/
 #### Session Viewer Tool
 ```bash
 # View complete session information
-python src/sandbox/session_viewer.py sessions/<session_id>
+python langgraph_sandbox/sandbox/session_viewer.py sessions/<session_id>
 
 # View last 10 log entries
-python src/sandbox/session_viewer.py sessions/<session_id> --limit 10
+python langgraph_sandbox/sandbox/session_viewer.py sessions/<session_id> --limit 10
 
 # Skip state and artifacts display
-python src/sandbox/session_viewer.py sessions/<session_id> --no-state --no-artifacts
+python langgraph_sandbox/sandbox/session_viewer.py sessions/<session_id> --no-state --no-artifacts
 ```
 
 #### Debugging Benefits
@@ -503,7 +503,7 @@ The sandbox runs in a custom Docker image with:
 - Ensure you have Python >= 3.11: `python --version`
 - Install in the correct environment: `pip install -e .`
 - If using conda, activate the correct environment first
-- For usage examples, run from project root: `python src/main.py`
+- For usage examples, run from project root: `python langgraph_sandbox/main.py`
 
 **Container startup failures:**
 - Ensure Docker is running
@@ -522,7 +522,7 @@ The sandbox runs in a custom Docker image with:
 
 **Usage example failures:**
 - Examples must be run from the project root directory
-- Use `python src/main.py` command
+- Use `python langgraph_sandbox/main.py` command
 - Do not run examples directly from their subdirectories
 
 ## Next Steps

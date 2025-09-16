@@ -7,8 +7,8 @@ from typing import Tuple
 
 import pytest
 
-from src.artifacts.store import ensure_artifact_store
-from src.artifacts.ingest import ingest_files
+from langgraph_sandbox.artifacts.store import ensure_artifact_store
+from langgraph_sandbox.artifacts.ingest import ingest_files
 
 # Helpers
 def sha256_bytes(b: bytes) -> str:

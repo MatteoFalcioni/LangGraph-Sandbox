@@ -2,9 +2,9 @@
 from pathlib import Path
 import sqlite3
 
-from src.artifacts.store import ensure_artifact_store
-from src.artifacts.ingest import ingest_files
-from src.artifacts.reader import get_metadata, read_bytes, read_text
+from langgraph_sandbox.artifacts.store import ensure_artifact_store
+from langgraph_sandbox.artifacts.ingest import ingest_files
+from langgraph_sandbox.artifacts.reader import get_metadata, read_bytes, read_text
 
 def test_reader_roundtrip(tmp_path, monkeypatch):
     # isolated store

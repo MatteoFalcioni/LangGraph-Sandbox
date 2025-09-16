@@ -48,11 +48,10 @@ dev = [
     "mypy",
 ]
 
-# Entry points removed - users can run python src/main.py directly
+# Entry points removed - users can run python langgraph_sandbox/main.py directly
 
 [tool.setuptools.packages.find]
-where = ["src"]
 include = ["*"]
 
 [tool.setuptools.package-data]
-"src.setup" = ["*.env", "Dockerfile"]
+"langgraph_sandbox.setup" = ["*.env", "Dockerfile"]

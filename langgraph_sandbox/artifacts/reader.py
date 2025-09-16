@@ -1,4 +1,4 @@
-# src/artifacts/reader.py
+# langgraph_sandbox/artifacts/reader.py
 """
 Small helpers to read artifacts from the local blobstore by artifact ID.
 Pipeline:

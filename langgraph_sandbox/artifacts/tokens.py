@@ -1,4 +1,4 @@
-# src/artifacts/tokens.py
+# langgraph_sandbox/artifacts/tokens.py
 from __future__ import annotations
 import base64, hmac, os, time, secrets
 from hashlib import sha256

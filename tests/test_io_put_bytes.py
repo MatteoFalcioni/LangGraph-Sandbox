@@ -4,7 +4,7 @@ import tarfile
 
 import pytest
 
-from src.sandbox.io import put_bytes, _tar_single_file_bytes
+from langgraph_sandbox.sandbox.io import put_bytes, _tar_single_file_bytes
 
 
 class FakeContainer:

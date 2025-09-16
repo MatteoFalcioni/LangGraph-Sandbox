@@ -1,4 +1,4 @@
-# src/artifacts/ingest.py
+# langgraph_sandbox/artifacts/ingest.py
 """
 Ingest new artifact files from a session's staging folder (/session/artifacts inside the container).
 Host-side: we receive HOST paths of new files, move their bytes into a content-addressed blobstore,

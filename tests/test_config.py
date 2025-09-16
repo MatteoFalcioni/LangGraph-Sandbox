@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-# Ensure project root is importable (src/__init__.py exists)
+# Ensure project root is importable (langgraph_sandbox/__init__.py exists)
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.config import Config, SessionStorage, DatasetAccess  # noqa: E402
+from langgraph_sandbox.config import Config, SessionStorage, DatasetAccess  # noqa: E402
 
 
 ENV_KEYS = [
