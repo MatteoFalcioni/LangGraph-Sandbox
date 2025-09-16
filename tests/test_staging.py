@@ -11,8 +11,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from langgraph_sandbox.config import Config, SessionStorage, DatasetAccess
-from langgraph_sandbox.datasets.cache import read_ids, add_id, cache_file_path
-from langgraph_sandbox.datasets.staging import (
+from langgraph_sandbox.dataset_manager.cache import read_ids, add_id, cache_file_path
+from langgraph_sandbox.dataset_manager.staging import (
     stage_dataset_into_sandbox,
     container_staged_path,
     container_ro_path,

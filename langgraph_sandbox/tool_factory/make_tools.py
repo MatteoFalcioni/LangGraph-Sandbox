@@ -143,8 +143,8 @@ def make_select_dataset_tool(
             from ..config import Config
         except ImportError:
             from config import Config
-        from datasets.cache import DatasetStatus, add_entry
-        from datasets.sync import load_pending_datasets
+        from ..dataset_manager.cache import DatasetStatus, add_entry
+        from ..dataset_manager.sync import load_pending_datasets
         
         # Load configuration
         cfg = Config.from_env()

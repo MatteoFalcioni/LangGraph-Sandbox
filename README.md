@@ -160,7 +160,7 @@ pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
 
 **Note:** After installation, the package modules are available as top-level imports:
 - `from langgraph_sandbox import make_code_sandbox_tool, SessionManager, Config`
-- `import langgraph_sandbox.tool_factory`, `import langgraph_sandbox.sandbox`, `import langgraph_sandbox.artifacts`, `import langgraph_sandbox.datasets`
+- `import langgraph_sandbox.tool_factory`, `import langgraph_sandbox.sandbox`, `import langgraph_sandbox.artifacts`, `import langgraph_sandbox.dataset_manager`
 
 **Usage Examples:** The package includes complete usage examples that are installed with the package. You can find them in your Python environment or use them as templates for your own projects.
 

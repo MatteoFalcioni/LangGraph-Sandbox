@@ -1,4 +1,4 @@
-# langgraph_sandbox/datasets/sync.py
+# langgraph_sandbox/dataset_manager/sync.py
 from __future__ import annotations
 
 from typing import Dict, List

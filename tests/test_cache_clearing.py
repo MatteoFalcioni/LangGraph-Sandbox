@@ -9,7 +9,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from langgraph_sandbox.config import Config, SessionStorage, DatasetAccess
-from langgraph_sandbox.datasets.cache import (
+from langgraph_sandbox.dataset_manager.cache import (
     cache_file_path, read_ids, write_ids, add_id, is_cached, clear_cache
 )
 
