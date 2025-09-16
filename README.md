@@ -197,7 +197,7 @@ The system provides **production-ready LangGraph tools** out of the box through 
 - Fetches datasets from your API sources
 - Stages them directly into the sandbox
 - Smart caching with PENDING/LOADED/FAILED status tracking
-- Client wrapper pattern for easy integration [[!]](https://vscode.dev/github/MatteoFalcioni/LangGraph-Sandbox/blob/main/README.md#L220)
+- Client wrapper pattern for easy integration
 
 **`make_export_datasets_tool`** - Export modified datasets to host filesystem
 - Timestamped exports to prevent overwrites
