@@ -30,13 +30,24 @@ def main():
     try:
         # Import the simple sandbox main module and execute it
         import importlib.util
-        spec = importlib.util.spec_from_file_location("simple_main", simple_sandbox_dir / "main.py")
+        main_file = simple_sandbox_dir / "main.py"
+        
+        spec = importlib.util.spec_from_file_location("simple_main", main_file)
         simple_main = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(simple_main)
+        
+        # Execute the main function from the simple sandbox
+        if hasattr(simple_main, 'main'):
+            simple_main.main()
+        else:
+            # If no main function, execute the module directly
+            exec(open(main_file).read())
     except Exception as e:
         print(f"Error running simple sandbox: {e}")
         print("Make sure you're running from the LangGraph-Sandbox root directory.")
         print("Also ensure Docker is running and the sandbox image is built.")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
 .env
-BIND_MODE_SESSION_LOGGING.md
 MANIFEST.in
 README.md
 docker.env
@@ -60,6 +59,7 @@ tests/test_io_put_bytes.py
 tests/test_session_manager_modes.py
 tests/test_staging.py
 usage_examples/__init__.py
+usage_examples/fully_local/BIND_MODE_LOGGING_README.md
 usage_examples/fully_local/README.md
 usage_examples/fully_local/__init__.py
 usage_examples/fully_local/fully_local.env

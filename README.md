@@ -70,18 +70,14 @@ pip install -e .
 docker build -t sandbox:latest -f Dockerfile .
 ```
 
-Set your OpenAI API key by modifying the `example.env` file, or set environment variable:
-
-```bash
-export OPENAI_API_KEY=your_api_key_here
-```
-
-And then you can run a simple example
+Set your OpenAI API key by modifying the [`simple_sandbox.env`](usage_examples\simple_sandbox\simple_sandbox.env) file, and run a the example:
 
 ```bash
 # Run the simple sandbox
 langgraph-sandbox
 ```
+
+This will start a simple LangGraph agent with sandbox-coding capabilities. 
 
 ### Option 2: Manual Installation
 
@@ -95,18 +91,11 @@ docker build -t sandbox:latest -f Dockerfile .
 pip install -r requirements.txt
 ```
 
-Then set your OpenAI API key by modifying the `example.env` file, or set environment variable:
-
-Create a `.env` file or set environment variable:
-```bash
-export OPENAI_API_KEY=your_api_key_here
-```
-
-And then you can run a simple example:
+Then set your OpenAI API key by modifying the [`simple_sandbox.env`](usage_examples\simple_sandbox\simple_sandbox.env) file and run a simple example:
 
 ```bash
 # Run Simple Example
-DATASET_ACCESS=NONE python main.py
+python main.py
 ```
 
 ## Configuration
@@ -138,13 +127,17 @@ TMPFS_SIZE_MB=1024
 ### Quick Configuration Examples
 
 **Simple execution:**
+
+In `.env`, set `DATASET_ACCESS=NONE`, then:
 ```bash
-DATASET_ACCESS=NONE python main.py
+python main.py
 ```
 
 **Local development:**
+
+In `.env`, set `SESSION_STORAGE=BIND`, `DATASET_ACCESS=LOCAL_RO` and `DATASETS_HOST_RO=./`, then:
 ```bash
-SESSION_STORAGE=BIND DATASET_ACCESS=LOCAL_RO DATASETS_HOST_RO=./data python main.py
+data python main.py
 ```
 
 **Production (default):**
@@ -161,6 +154,11 @@ The repository includes three complete examples demonstrating different modes:
 cd usage_examples/simple_sandbox
 python main.py
 ```
+or simply (this is the default example)
+```bash
+langgraph-sandbox
+``` 
+
 - No datasets, pure code execution
 - Perfect for algorithms and calculations
 - Everything runs in memory
@@ -236,7 +234,7 @@ sessions/<session_id>/
 ├── session.log                    # Complete execution history
 ├── session_metadata.json          # Session info and statistics
 ├── python_state.json             # Current Python state snapshot
-└── artifacts/                    # Files before ingestion
+└── artifacts/                    # Ingested at runtime
 ```
 
 #### Session Viewer Tool
@@ -292,6 +290,7 @@ The sandbox runs in a custom Docker image with:
 - `SessionManager.start(session_id)` - Start new session
 - `SessionManager.exec(session_id, code)` - Execute code
 - `SessionManager.stop(session_id)` - Stop session
+
 ## Troubleshooting
 
 ### Common Issues

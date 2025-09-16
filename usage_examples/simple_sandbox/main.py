@@ -19,8 +19,7 @@ from ex2_graph.tools import set_session_id
 from src.sandbox.container_utils import cleanup_sandbox_containers
 from src.artifacts.reader import fetch_artifact_urls
 
-if __name__ == "__main__":
-
+def main():
     app = FastAPI()
 
     env = load_dotenv("simple_sandbox.env")
@@ -108,3 +107,6 @@ if __name__ == "__main__":
         # Artifacts are displayed directly in the agent's response
         
         print("\n" + "="*50 + "\n")
+
+if __name__ == "__main__":
+    main()
