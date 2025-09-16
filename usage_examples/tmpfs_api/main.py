@@ -23,7 +23,6 @@ from langgraph_sandbox.config import Config
 from ex3_graph.tmpfs_api_ex_graph import get_builder
 from ex3_graph.tools import set_session_id, client
 from langgraph_sandbox.sandbox.container_utils import cleanup_sandbox_containers
-from langgraph_sandbox.artifacts.reader import fetch_artifact_urls
 
 if __name__ == "__main__":
 

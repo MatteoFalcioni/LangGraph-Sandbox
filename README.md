@@ -78,7 +78,7 @@ pip install -e .
 docker build -t sandbox:latest -f Dockerfile .
 ```
 
-Set your OpenAI API key by modifying the [`simple_sandbox.env`](usage_examples\simple_sandbox\simple_sandbox.env) file, and run the example:
+Set your OpenAI API key by modifying the `example.env` file, rename it to `sandbox.env` and run the example:
 
 ```bash
 # Run the simple sandbox
@@ -97,7 +97,7 @@ pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
 sandbox-setup
 ```
 
-Then customize your `.env` file and use in your code:
+Then customize your `sandbox.env` file and use in your code:
 
 ```python
 from langgraph_sandbox import make_code_sandbox_tool, SessionManager, Config
@@ -135,7 +135,7 @@ docker build -t sandbox:latest -f Dockerfile .
 pip install -r requirements.txt
 ```
 
-Then set your OpenAI API key by modifying the [`simple_sandbox.env`](usage_examples\simple_sandbox\simple_sandbox.env) file and run a simple example:
+Then set your OpenAI API key by modifying the `example.env` file, rename it to `simple_sandbox.env` and run a simple example:
 
 ```bash
 # Run Simple Example
@@ -184,11 +184,7 @@ docker build -t sandbox:latest -f Dockerfile .
 
 ### Customize Configuration
 
-Edit the `.env` file to customize your setup:
-
-```bash
-nano .env
-```
+Edit the `example.env` file to customize your setup.
 
 Key settings you might want to change:
 - `SESSION_STORAGE`: `TMPFS` (default) or `BIND`
@@ -196,6 +192,8 @@ Key settings you might want to change:
 - `SESSIONS_ROOT`: Directory for session storage
 - `SANDBOX_IMAGE`: Docker image name (default: `sandbox:latest`)
 - `TMPFS_SIZE_MB`: Size of tmpfs mount (default: 1024)
+
+Then rename it to `sandbox.env`.
 
 ### Usage in Your Code
 
@@ -252,7 +250,7 @@ dataset_tool = make_select_dataset_tool(
 your-project/
 ├── .env                    # Your configuration
 ├── Dockerfile             # Copied from package
-├── example.env            # Template (copied from package)
+├── example.env            # Template (copied from package) -> **rename to sandbox.env**
 ├── docker.env             # Alternative config (copied from package)
 ├── your_code.py           # Your Python code
 └── ...
@@ -263,7 +261,7 @@ your-project/
 To use a custom Docker image:
 
 1. Modify the Dockerfile in your project directory
-2. Update the `SANDBOX_IMAGE` in your `.env` file
+2. Update the `SANDBOX_IMAGE` in your `sandbox.env` file
 3. Rebuild the image:
    ```bash
    docker build -t your-custom-image:latest .
@@ -299,14 +297,14 @@ TMPFS_SIZE_MB=1024
 
 **Simple execution:**
 
-In `.env`, set `DATASET_ACCESS=NONE`, then:
+In `sandbox.env`, set `DATASET_ACCESS=NONE`, then:
 ```bash
 langgraph-sandbox
 ```
 
 **Local development:**
 
-In `.env`, set `SESSION_STORAGE=BIND`, `DATASET_ACCESS=LOCAL_RO` and `DATASETS_HOST_RO=./`, then:
+In `sandbox.env`, set `SESSION_STORAGE=BIND`, `DATASET_ACCESS=LOCAL_RO` and `DATASETS_HOST_RO=./`, then:
 ```bash
 data python main.py
 ```
