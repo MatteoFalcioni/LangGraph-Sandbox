@@ -2,7 +2,6 @@
 Dockerfile
 MANIFEST.in
 README.md
-TODO.md
 docker.env
 example.env
 pyproject.toml

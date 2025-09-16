@@ -49,8 +49,8 @@ dev = [
 ]
 
 [project.scripts]
-langgraph-sandbox = "main:main"
-langgraph-sandbox-setup = "setup:main"
+langgraph-sandbox = "src.main:main"
+langgraph-sandbox-setup = "src.setup:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
