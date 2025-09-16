@@ -158,8 +158,6 @@ code_tool = make_code_sandbox_tool(
 )
 ```
 
-This will start a simple LangGraph agent with sandbox-coding capabilities. 
-
 ### Option 2: Manual Installation
 
 ```bash
