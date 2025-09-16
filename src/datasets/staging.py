@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from config import Config
-from sandbox.io import put_bytes
-from datasets.fetcher import fetch_dataset
+from ..sandbox.io import put_bytes
+from .fetcher import fetch_dataset
 
 
 def _atomic_write_bytes(path: Path, data: bytes) -> None:

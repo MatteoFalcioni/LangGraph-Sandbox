@@ -10,7 +10,7 @@ from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 
-from sandbox.session_manager import SessionManager
+from ..sandbox.session_manager import SessionManager
 
 
 def _default_get_session_key() -> str:

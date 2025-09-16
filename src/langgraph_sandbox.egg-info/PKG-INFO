@@ -120,7 +120,7 @@ Set your OpenAI API key by modifying the [`simple_sandbox.env`](usage_examples\s
 
 ```bash
 # Run the simple sandbox
-langgraph-sandbox
+python src/main.py
 ```
 
 #### For Using in Other Projects:
@@ -132,7 +132,7 @@ pip install -e /path/to/LangGraph-Sandbox
 pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
 
 # Run setup to build Docker image and create configuration
-langgraph-sandbox-setup
+python src/setup/__init__.py
 ```
 
 Then customize your `.env` file and use in your code:
@@ -151,10 +151,13 @@ session_manager = SessionManager(
     tmpfs_size=config.tmpfs_size_mb,
 )
 
-# Create tools
+# Create tools with a session key function
+def get_session_key():
+    return "my_unique_session_id"  # Use your own session management key if needed for UI (otherwise defaults to convo)
+
 code_tool = make_code_sandbox_tool(
     session_manager=session_manager,
-    session_key_fn=lambda: "my_session"
+    session_key_fn=get_session_key
 )
 ```
 
@@ -196,6 +199,8 @@ pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
 **Note:** After installation, the package modules are available as top-level imports:
 - `from src import make_code_sandbox_tool, SessionManager, Config`
 - `import tool_factory`, `import sandbox`, `import artifacts`, `import datasets`
+
+**Usage Examples:** The package includes complete usage examples that are installed with the package. You can find them in your Python environment or use them as templates for your own projects.
 
 ### Setup Docker Environment
 
@@ -249,10 +254,13 @@ session_manager = SessionManager(
     tmpfs_size=config.tmpfs_size_mb,
 )
 
-# Create tools
+# Create tools with a session key function
+def get_session_key():
+    return "my_unique_session_id"  # Use your own session management
+
 code_tool = make_code_sandbox_tool(
     session_manager=session_manager,
-    session_key_fn=lambda: "my_session",
+    session_key_fn=get_session_key,
     timeout_s=60
 )
 
@@ -347,9 +355,7 @@ The repository includes three complete examples demonstrating different modes. *
 ### Simple Sandbox (TMPFS_NONE)
 ```bash
 # From project root - recommended approach
-langgraph-sandbox
-# or
-python main.py
+python src/main.py
 
 # Alternative: run directly from example directory
 cd usage_examples/simple_sandbox
@@ -410,10 +416,15 @@ Instead of writing custom tool implementations, you get:
 
 ```python
 # Example: Create tools in 3 lines
-code_tool = make_code_sandbox_tool(session_manager=sm, session_key_fn=get_session)
+def get_session_key():
+    return "my_session_id"  # Implement your session management logic
+
+code_tool = make_code_sandbox_tool(session_manager=sm, session_key_fn=get_session_key)
 dataset_tool = make_select_dataset_tool(session_manager=sm, fetch_fn=my_fetch, client=my_client)
-export_tool = make_export_datasets_tool(session_manager=sm, session_key_fn=get_session)
-``` 
+export_tool = make_export_datasets_tool(session_manager=sm, session_key_fn=get_session_key)
+```
+
+> **Session Key Management:** The `session_key_fn` parameter is crucial for maintaining session isolation. Each unique session key gets its own container, so implement proper session management in your application (e.g., user ID, conversation ID, or thread ID). 
 
 > **Note:** Notice that the `make_select_dataset_tool` expects the `fetch_fn` parameter to be a function that, given your dataset_id, returns the dataset **bytes** through your API client. 
 >
@@ -530,7 +541,7 @@ The sandbox runs in a custom Docker image with:
 - Ensure you have Python >= 3.11: `python --version`
 - Install in the correct environment: `pip install -e .`
 - If using conda, activate the correct environment first
-- For usage examples, run from project root: `python main.py` or `langgraph-sandbox`
+- For usage examples, run from project root: `python src/main.py`
 
 **Container startup failures:**
 - Ensure Docker is running
@@ -549,7 +560,7 @@ The sandbox runs in a custom Docker image with:
 
 **Usage example failures:**
 - Examples must be run from the project root directory
-- Use `python main.py` or `langgraph-sandbox` commands
+- Use `python src/main.py` command
 - Do not run examples directly from their subdirectories
 
 ## Next Steps

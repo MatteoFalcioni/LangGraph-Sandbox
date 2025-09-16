@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Dict, List
 from config import Config
-from datasets.staging import stage_dataset_into_sandbox, container_staged_path, container_ro_path
-from datasets.cache import DatasetStatus, update_entry_status
+from .staging import stage_dataset_into_sandbox, container_staged_path, container_ro_path
+from .cache import DatasetStatus, update_entry_status
 
 async def load_pending_datasets(
     *,

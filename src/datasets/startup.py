@@ -14,7 +14,7 @@ if __name__ == "__main__":
     sys.path.insert(0, str(project_root))
 
 from config import Config, DatasetAccess
-from datasets.cache import write_ids
+from .cache import write_ids
 
 
 def discover_local_datasets(cfg: Config) -> List[str]:

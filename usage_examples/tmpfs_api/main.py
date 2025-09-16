@@ -1,7 +1,13 @@
 # Set environment variables to use tmpfs_api database and blobstore
 # This must be done before any imports that use the artifact system
 import os
+import sys
 from pathlib import Path
+
+# Add the project root to Python path so we can import from src
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 os.environ["ARTIFACTS_DB_PATH"] = str(Path("tmpfs_api_artifacts.db").resolve())
 os.environ["BLOBSTORE_DIR"] = str(Path("tmpfs_api_blobstore").resolve())
 

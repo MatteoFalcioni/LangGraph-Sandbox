@@ -18,8 +18,8 @@ import io
 import tarfile
 import tempfile
 
-from artifacts.ingest import ingest_files
-from sandbox.container_utils import cleanup_sandbox_containers
+from ..artifacts.ingest import ingest_files
+from .container_utils import cleanup_sandbox_containers
 
 from enum import Enum
 

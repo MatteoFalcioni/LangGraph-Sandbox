@@ -48,9 +48,7 @@ dev = [
     "mypy",
 ]
 
-[project.scripts]
-langgraph-sandbox = "src.main:main"
-langgraph-sandbox-setup = "src.setup:main"
+# Entry points removed - users can run python src/main.py directly
 
 [tool.setuptools.packages.find]
 where = ["src"]

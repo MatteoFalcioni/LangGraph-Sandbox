@@ -11,6 +11,7 @@ Usage:
     python src/main.py --help            # Show help
 """
 
+from cmd import PROMPT
 import sys
 import os
 import uuid
@@ -23,11 +24,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 import uvicorn
 
-from src.artifacts.store import ensure_artifact_store
-from src.artifacts.api import router as artifacts_router
-from src.config import Config
-from src.sandbox.container_utils import cleanup_sandbox_containers
-from src.artifacts.reader import fetch_artifact_urls
+from artifacts.store import ensure_artifact_store
+from artifacts.api import router as artifacts_router
+from config import Config
+from sandbox.container_utils import cleanup_sandbox_containers
+from artifacts.reader import fetch_artifact_urls
 
 def main():
     """Main entry point for the LangGraph Sandbox."""
@@ -63,7 +64,7 @@ def main():
     print(f"✅ Starting new session: {convo_id}")
     
     # Create session manager
-    from src.sandbox.session_manager import SessionManager
+    from sandbox.session_manager import SessionManager
     session_manager = SessionManager(
         image=cfg.sandbox_image,
         session_storage=cfg.session_storage,
@@ -77,7 +78,7 @@ def main():
     def get_session_key():
         return convo_id
     
-    from src.tool_factory.make_tools import make_code_sandbox_tool, make_export_datasets_tool
+    from tool_factory.make_tools import make_code_sandbox_tool, make_export_datasets_tool
     code_exec_tool = make_code_sandbox_tool(
         session_manager=session_manager,
         session_key_fn=get_session_key
@@ -104,51 +105,58 @@ def main():
     print("✅ Artifact server started on http://localhost:8000")
 
     # Create simple graph
-    from langgraph.graph import StateGraph, END
+    from langgraph.graph import StateGraph, MessagesState, END
     from langchain_openai import ChatOpenAI
-    from langgraph.graph.message import add_messages
-    from typing import TypedDict, Annotated
-    
-    class State(TypedDict):
-        messages: Annotated[list, add_messages]
+    from langgraph.graph import StateGraph, MessagesState, START, END
+    from langchain_core.messages import AIMessage, HumanMessage
+    from langchain_openai import ChatOpenAI
+    from langgraph.prebuilt import create_react_agent
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    PROMPT = """
+            You are a helpful AI assistant that writes Python code to run in a Docker sandbox.
+
+            Rules:
+            1. Always use `print(...)` to show results. Do not rely on implicit printing (e.g. `df.head()` must be wrapped in `print(df.head())`).
+            2. This is a simple sandbox with NO datasets - you can only work with data you create or generate in your code.
+            3. A writable persistent folder `/session` exists. Use it to save intermediate files that need to be reused across multiple tool calls in the same conversation.
+            4. For run-specific outputs (plots, text files, etc.), save them into `/session/artifacts/`. These files will be automatically detected, copied out of the container, and ingested into the artifact store with deduplication and metadata tracking.
+            5. Always include required imports, and explicitly create directories if needed (e.g. `Path("/session/artifacts").mkdir(parents=True, exist_ok=True)`).
+            6. Handle errors explicitly (e.g. check if files exist before reading).
+            7. Be concise and focused: only write code that directly answers the user's request.
+            8. The sandbox runs in a persistent container per conversation - variables and imports persist between tool calls in the same session.
+            9. Artifacts are automatically processed: files in `/session/artifacts/` are detected after each execution, copied to the host, stored in a content-addressed blobstore, and made available via the artifacts API.
+            10. After creating artifacts, you will be able to see links for downloading them. ALWAYS provide them to the user **exactly as is**. Do not modify them or invent URLs. Do not use markdown link syntax like [filename](url). Example: Say "The plot has been saved as <full link>" instead of "[Download plot.png](url)".
+            11. EXPORT DATASETS: If you create or modify datasets in `/session/data/`, you can use the `export_datasets` tool to save them to the host filesystem at `./exports/modified_datasets/` with timestamp prefixes.
+            12. MEMORY MANAGEMENT: The sandbox automatically cleans up matplotlib figures and old artifacts after each execution to prevent space issues. Your intermediate files in /tmp and /session are preserved. The sandbox has 4GB of tmpfs space available.
+
+            IMPORTANT: This sandbox has NO datasets available. You can only work with data you create, generate, or fetch from external sources in your code.
+            """
     
     # Initialize LLM
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model="gpt-4.1", temperature=0)
+    coding_agent = create_react_agent(
+        model=llm,
+        tools=[code_exec_tool, export_datasets_tool],
+        prompt=PROMPT
+    )
     
-    # Create graph
-    def call_model(state: State):
-        return {"messages": [llm.invoke(state["messages"])]}
-    
-    def call_tool(state: State):
-        messages = state["messages"]
-        last_message = messages[-1]
-        
-        if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-            tool_call = last_message.tool_calls[0]
-            tool_name = tool_call["name"]
-            
-            if tool_name == "code_sandbox":
-                result = code_exec_tool.invoke({"code": tool_call["args"]["code"]})
-                return {"messages": [result]}
-            elif tool_name == "export_datasets":
-                result = export_datasets_tool.invoke({"container_path": tool_call["args"]["container_path"]})
-                return {"messages": [result]}
-        
-        return {"messages": []}
-    
-    # Build graph
-    workflow = StateGraph(State)
-    workflow.add_node("agent", call_model)
-    workflow.add_node("tools", call_tool)
-    workflow.add_edge("agent", "tools")
-    workflow.add_edge("tools", "agent")
-    workflow.set_entry_point("agent")
-    
-    # Add tools to LLM
-    llm_with_tools = llm.bind_tools([code_exec_tool, export_datasets_tool])
-    
+    async def call_model(state: MessagesState):
+        result = await coding_agent.ainvoke({"messages" : state["messages"]})
+        last = result["messages"][-1]
+
+        update = AIMessage(content=last.content)
+
+        return {"messages": [update]}
+
+    builder = StateGraph(MessagesState)
+
+    builder.add_node("chat_model", call_model)
+    builder.add_edge(START, "chat_model")
+    builder.add_edge("chat_model", END)
+
     # Compile graph
-    graph = workflow.compile(checkpointer=InMemorySaver())
+    graph = builder.compile(checkpointer=InMemorySaver())
     
     print("\n🚀 Interactive Sandbox Ready!")
     print("=" * 60)
@@ -173,14 +181,7 @@ def main():
                     {"messages": [{"role": "user", "content": usr_msg}]},
                     {"configurable": {"thread_id": convo_id}, "recursion_limit": 25},
                 ):
-                    if "agent" in chunk and chunk["agent"]["messages"]:
-                        last_msg = chunk["agent"]["messages"][-1]
-                        if hasattr(last_msg, 'content') and last_msg.content:
-                            print(last_msg.content, end="", flush=True)
-                    elif "tools" in chunk and chunk["tools"]["messages"]:
-                        last_msg = chunk["tools"]["messages"][-1]
-                        if hasattr(last_msg, 'content') and last_msg.content:
-                            print(f"\n{last_msg.content}")
+                    print(f"AI: {chunk['chat_model']['messages'][-1].content}")
             
             asyncio.run(run_conversation())
             print()  # New line after response

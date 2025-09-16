@@ -82,7 +82,7 @@ Set your OpenAI API key by modifying the [`simple_sandbox.env`](usage_examples\s
 
 ```bash
 # Run the simple sandbox
-langgraph-sandbox
+python src/main.py
 ```
 
 #### For Using in Other Projects:
@@ -94,7 +94,7 @@ pip install -e /path/to/LangGraph-Sandbox
 pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
 
 # Run setup to build Docker image and create configuration
-langgraph-sandbox-setup
+python src/setup/__init__.py
 ```
 
 Then customize your `.env` file and use in your code:
@@ -115,7 +115,7 @@ session_manager = SessionManager(
 
 # Create tools with a session key function
 def get_session_key():
-    return "my_unique_session_id"  # Use your own session management
+    return "my_unique_session_id"  # Use your own session management key if needed for UI (otherwise defaults to convo)
 
 code_tool = make_code_sandbox_tool(
     session_manager=session_manager,
@@ -317,9 +317,7 @@ The repository includes three complete examples demonstrating different modes. *
 ### Simple Sandbox (TMPFS_NONE)
 ```bash
 # From project root - recommended approach
-langgraph-sandbox
-# or
-python main.py
+python src/main.py
 
 # Alternative: run directly from example directory
 cd usage_examples/simple_sandbox
@@ -505,7 +503,7 @@ The sandbox runs in a custom Docker image with:
 - Ensure you have Python >= 3.11: `python --version`
 - Install in the correct environment: `pip install -e .`
 - If using conda, activate the correct environment first
-- For usage examples, run from project root: `python main.py` or `langgraph-sandbox`
+- For usage examples, run from project root: `python src/main.py`
 
 **Container startup failures:**
 - Ensure Docker is running
@@ -524,7 +522,7 @@ The sandbox runs in a custom Docker image with:
 
 **Usage example failures:**
 - Examples must be run from the project root directory
-- Use `python main.py` or `langgraph-sandbox` commands
+- Use `python src/main.py` command
 - Do not run examples directly from their subdirectories
 
 ## Next Steps

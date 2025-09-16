@@ -1,7 +1,13 @@
 # Set environment variables to use simple database and blobstore
 # This must be done before any imports that use the artifact system
 import os
+import sys
 from pathlib import Path
+
+# Add the project root to Python path so we can import from src
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 os.environ["ARTIFACTS_DB_PATH"] = str(Path("simple_artifacts.db").resolve())
 os.environ["BLOBSTORE_DIR"] = str(Path("simple_blobstore").resolve())
 
@@ -90,12 +96,6 @@ def main():
                     {"configurable": {"thread_id": f"{convo_id}"}, "recursion_limit": 25},
                 ):
                     print(f"AI: {chunk['chat_model']['messages'][-1].content}")
-                    
-                    # Check if this is the final result
-                    if "messages" in chunk and chunk["messages"]:
-                        last_message = chunk["messages"][-1]
-                        if hasattr(last_message, 'content') and last_message.content:
-                            print(f"\nAI: {last_message.content}")
             
             asyncio.run(run_stream())
                         
