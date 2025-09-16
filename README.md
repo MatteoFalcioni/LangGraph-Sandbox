@@ -10,6 +10,7 @@ A production-ready Docker sandbox for executing Python code within LangGraph age
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Usage Examples](#usage-examples)
+- [Tool Factory](#tool-factory)
 - [Artifact System](#artifact-system)
 - [Session Management](#session-management)
 - [Development & Debugging](#development--debugging)
