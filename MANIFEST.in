@@ -1,8 +1,9 @@
 include README.md
 include requirements.txt
-include *.env
-include *.md
+include pyproject.toml
+include setup.py
 include Dockerfile
-recursive-include usage_examples *.py *.env *.md
-recursive-include tests *.py
-recursive-include example_llm_data *.parquet
+include example.env
+include docker.env
+recursive-include usage_examples *
+recursive-include src *

@@ -113,14 +113,15 @@ session_manager = SessionManager(
     tmpfs_size=config.tmpfs_size_mb,
 )
 
-# Create tools
+# Create tools with a session key function
+def get_session_key():
+    return "my_unique_session_id"  # Use your own session management
+
 code_tool = make_code_sandbox_tool(
     session_manager=session_manager,
-    session_key_fn=lambda: "my_session"
+    session_key_fn=get_session_key
 )
 ```
-
-This will start a simple LangGraph agent with sandbox-coding capabilities. 
 
 ### Option 2: Manual Installation
 
@@ -160,6 +161,8 @@ pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
 **Note:** After installation, the package modules are available as top-level imports:
 - `from src import make_code_sandbox_tool, SessionManager, Config`
 - `import tool_factory`, `import sandbox`, `import artifacts`, `import datasets`
+
+**Usage Examples:** The package includes complete usage examples that are installed with the package. You can find them in your Python environment or use them as templates for your own projects.
 
 ### Setup Docker Environment
 
@@ -213,10 +216,13 @@ session_manager = SessionManager(
     tmpfs_size=config.tmpfs_size_mb,
 )
 
-# Create tools
+# Create tools with a session key function
+def get_session_key():
+    return "my_unique_session_id"  # Use your own session management
+
 code_tool = make_code_sandbox_tool(
     session_manager=session_manager,
-    session_key_fn=lambda: "my_session",
+    session_key_fn=get_session_key,
     timeout_s=60
 )
 
@@ -374,10 +380,15 @@ Instead of writing custom tool implementations, you get:
 
 ```python
 # Example: Create tools in 3 lines
-code_tool = make_code_sandbox_tool(session_manager=sm, session_key_fn=get_session)
+def get_session_key():
+    return "my_session_id"  # Implement your session management logic
+
+code_tool = make_code_sandbox_tool(session_manager=sm, session_key_fn=get_session_key)
 dataset_tool = make_select_dataset_tool(session_manager=sm, fetch_fn=my_fetch, client=my_client)
-export_tool = make_export_datasets_tool(session_manager=sm, session_key_fn=get_session)
-``` 
+export_tool = make_export_datasets_tool(session_manager=sm, session_key_fn=get_session_key)
+```
+
+> **Session Key Management:** The `session_key_fn` parameter is crucial for maintaining session isolation. Each unique session key gets its own container, so implement proper session management in your application (e.g., user ID, conversation ID, or thread ID). 
 
 > **Note:** Notice that the `make_select_dataset_tool` expects the `fetch_fn` parameter to be a function that, given your dataset_id, returns the dataset **bytes** through your API client. 
 >
