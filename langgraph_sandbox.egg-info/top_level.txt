@@ -2,6 +2,5 @@ blobstore
 build
 example_llm_data
 langgraph_sandbox
-src
 tests
 usage_examples
