@@ -237,6 +237,7 @@ from langgraph_sandbox import (
     make_code_sandbox_tool,
     make_select_dataset_tool,
     make_export_datasets_tool,
+    make_list_datasets_tool,
     SessionManager,
     Config
 )
@@ -408,6 +409,12 @@ The system provides **production-ready LangGraph tools** out of the box through 
 - Automatic artifact ingestion for download URLs
 - Works with any file in `/session/data/`
 
+**`make_list_datasets_tool`** - List available datasets in the sandbox
+- **API mode**: Lists datasets loaded in `/session/data` (dynamically loaded datasets)
+- **LOCAL_RO mode**: Lists statically mounted files in `/data` (host-mounted datasets)
+- **NONE mode**: Returns message indicating no datasets are available
+- Provides detailed file information including size, modification time, and paths
+
 Instead of writing custom tool implementations, you get:
 - **Zero boilerplate**: Just call the factory with your dependencies
 - **Battle-tested**: Handles edge cases, timeouts, and error recovery
@@ -415,13 +422,14 @@ Instead of writing custom tool implementations, you get:
 - **Extensible**: Easy to customize with your own fetch functions and clients
 
 ```python
-# Example: Create tools in 3 lines
+# Example: Create tools in 4 lines
 def get_session_key():
     return "my_session_id"  # Implement your session management logic
 
 code_tool = make_code_sandbox_tool(session_manager=sm, session_key_fn=get_session_key)
 dataset_tool = make_select_dataset_tool(session_manager=sm, fetch_fn=my_fetch, client=my_client)
 export_tool = make_export_datasets_tool(session_manager=sm, session_key_fn=get_session_key)
+list_tool = make_list_datasets_tool(session_manager=sm, session_key_fn=get_session_key)
 ```
 
 > **Session Key Management:** The `session_key_fn` parameter is crucial for maintaining session isolation. Each unique session key gets its own container, so implement proper session management in your application (e.g., user ID, conversation ID, or thread ID). 
