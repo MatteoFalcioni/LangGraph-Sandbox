@@ -1,4 +1,4 @@
-from src.tool_factory.make_tools import make_code_sandbox_tool, make_export_datasets_tool
+from src.tool_factory.make_tools import make_code_sandbox_tool, make_export_datasets_tool, make_select_dataset_tool
 from src.config import Config
 from src.artifacts.tokens import create_download_url
 from src.artifacts.reader import get_metadata, fetch_artifact_urls
@@ -66,92 +66,6 @@ async def list_catalog_tool(
         }
     )
 
-@tool(
-    name_or_callable="select_dataset",
-    description="Select a dataset to load into sandbox as a parquet file. This will fetch and stage the dataset immediately."
-)
-async def select_dataset_tool(
-    dataset_id: Annotated[str, "The dataset ID"],
-    tool_call_id: Annotated[str, InjectedToolCallId],
-) -> Command:
-    from src.datasets.cache import add_entry, DatasetStatus, get_entry_status
-    from src.datasets.sync import load_pending_datasets
-    
-    session_id = get_session_key()
-    
-    # Check if dataset is already loaded
-    current_status = get_entry_status(cfg, session_id, dataset_id)
-    if current_status == DatasetStatus.LOADED:
-        return Command(
-            update={
-                "messages": [
-                    ToolMessage(
-                        content=f"Dataset '{dataset_id}' is already loaded and available in the sandbox.",
-                        tool_call_id=tool_call_id,
-                    )
-                ]
-            }
-        )
-    
-    # Add the dataset to cache with PENDING status
-    cache_path = add_entry(cfg, session_id, dataset_id, status=DatasetStatus.PENDING)
-    
-    try:
-        # Start the session if not already started
-        session_manager.start(session_id)
-        
-        # Create a wrapper function for get_dataset_bytes that only takes dataset_id
-        async def fetch_dataset_wrapper(ds_id: str) -> bytes:
-            return await get_dataset_bytes(client, ds_id)
-        
-        # Load the dataset into the sandbox
-        container = session_manager.container_for(session_id)
-        
-        loaded_datasets = await load_pending_datasets(
-            cfg=cfg,
-            session_id=session_id,
-            container=container,
-            fetch_fn=fetch_dataset_wrapper,
-            ds_ids=[dataset_id],
-        )
-        
-        if loaded_datasets:
-            dataset_info = loaded_datasets[0]
-            path_in_container = dataset_info["path_in_container"]
-            
-            return Command(
-                update={
-                    "messages": [
-                        ToolMessage(
-                            content=f"Dataset '{dataset_id}' successfully loaded into sandbox at {path_in_container}",
-                            tool_call_id=tool_call_id,
-                        )
-                    ]
-                }
-            )
-        else:
-            return Command(
-                update={
-                    "messages": [
-                        ToolMessage(
-                            content=f"Failed to load dataset '{dataset_id}' - no datasets were loaded",
-                            tool_call_id=tool_call_id,
-                        )
-                    ]
-                }
-            )
-            
-    except Exception as e:
-        return Command(
-            update={
-                "messages": [
-                    ToolMessage(
-                        content=f"Failed to load dataset '{dataset_id}': {str(e)}",
-                        tool_call_id=tool_call_id,
-                    )
-                ]
-            }
-        )
 
 
 # Create single session manager instance
@@ -173,4 +87,11 @@ code_exec_tool = make_code_sandbox_tool(
 export_datasets_tool = make_export_datasets_tool(
     session_manager=session_manager,
     session_key_fn=get_session_key
+)
+
+select_dataset_tool = make_select_dataset_tool(
+    session_manager=session_manager,
+    session_key_fn=get_session_key,
+    fetch_fn=get_dataset_bytes,
+    client=client
 )

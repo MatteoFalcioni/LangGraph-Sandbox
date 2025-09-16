@@ -98,6 +98,122 @@ def make_code_sandbox_tool(
     )(_impl)
 
 
+def make_select_dataset_tool(
+    *,
+    session_manager: SessionManager,
+    session_key_fn: Callable[[], str] = _default_get_session_key,
+    fetch_fn: Callable[[str], bytes],
+    client: Optional[object] = None,
+    name: str = "select_dataset",
+    description: str = (
+        "Select a dataset to load into sandbox as a parquet file. "
+        "This will fetch and stage the dataset immediately."
+    ),
+) -> Callable:
+    """
+    Factory that returns a LangChain Tool for selecting and loading datasets into the sandbox.
+    
+    Args:
+        session_manager: SessionManager instance to use for container operations
+        session_key_fn: Function to get current session key
+        fetch_fn: Function to fetch dataset bytes by ID
+        client: Optional client object to pass to fetch_fn
+        name: Tool name
+        description: Tool description
+        
+    Returns:
+        LangChain tool function
+    """
+    
+    class SelectDatasetArgs(BaseModel):
+        dataset_id: Annotated[str, Field(description="The dataset ID")]
+        tool_call_id: Annotated[str, InjectedToolCallId]
+        model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    async def _impl(
+        dataset_id: Annotated[str, "The dataset ID"], 
+        tool_call_id: Annotated[str, InjectedToolCallId]
+    ) -> Command:
+        """Select and load a dataset into the sandbox."""
+        from src.config import Config
+        from src.datasets.cache import DatasetStatus, add_entry
+        from src.datasets.sync import load_pending_datasets
+        
+        # Load configuration
+        cfg = Config.from_env()
+        session_id = session_key_fn()
+        
+        # Add the dataset to cache with PENDING status
+        cache_path = add_entry(cfg, session_id, dataset_id, status=DatasetStatus.PENDING)
+        
+        try:
+            # Start the session if not already started
+            session_manager.start(session_id)
+            
+            # Create wrapper function for fetch_fn that includes client if provided
+            if client is not None:
+                async def fetch_dataset_wrapper(ds_id: str) -> bytes:
+                    return await fetch_fn(client, ds_id)
+            else:
+                fetch_dataset_wrapper = fetch_fn
+            
+            # Load the dataset into the sandbox
+            container = session_manager.container_for(session_id)
+            
+            loaded_datasets = await load_pending_datasets(
+                cfg=cfg,
+                session_id=session_id,
+                container=container,
+                fetch_fn=fetch_dataset_wrapper,
+                ds_ids=[dataset_id],
+            )
+            
+            if loaded_datasets:
+                dataset_info = loaded_datasets[0]
+                path_in_container = dataset_info["path_in_container"]
+                
+                return Command(
+                    update={
+                        "messages": [
+                            ToolMessage(
+                                content=f"Dataset '{dataset_id}' successfully loaded into sandbox at {path_in_container}",
+                                tool_call_id=tool_call_id,
+                            )
+                        ]
+                    }
+                )
+            else:
+                return Command(
+                    update={
+                        "messages": [
+                            ToolMessage(
+                                content=f"Failed to load dataset '{dataset_id}' - no datasets were loaded",
+                                tool_call_id=tool_call_id,
+                            )
+                        ]
+                    }
+                )
+                
+        except Exception as e:
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            content=f"Failed to load dataset '{dataset_id}': {str(e)}",
+                            tool_call_id=tool_call_id,
+                        )
+                    ]
+                }
+            )
+    
+    # Return a LangChain Tool by applying the decorator at factory time
+    return tool(
+        name_or_callable=name,
+        description=description,
+        args_schema=SelectDatasetArgs,
+    )(_impl)
+
+
 def make_export_datasets_tool(
     *,
     session_manager: SessionManager,
