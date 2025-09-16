@@ -284,3 +284,134 @@ def make_export_datasets_tool(
         description=description,
         args_schema=ExportDatasetArgs,
     )(_impl)
+
+def make_list_datasets_tool(
+    *,
+    session_manager: SessionManager,
+    session_key_fn: Callable[[], str] = _default_get_session_key,
+    name: str = "list_datasets",
+    description: str = (
+        "List all datasets available in the sandbox. "
+        "In API mode: lists datasets loaded in /session/data. "
+        "In LOCAL_RO mode: lists statically mounted files in /data."
+    ),
+) -> Callable:
+    """
+    Factory that returns a LangChain Tool for listing datasets in the sandbox.
+    
+    Args:
+        session_manager: SessionManager instance to use for container operations
+        session_key_fn: Function to get current session key
+        name: Tool name
+        description: Tool description
+        
+    Returns:
+        LangChain tool function
+    """
+    
+    class ListDatasetsArgs(BaseModel):
+        tool_call_id: Annotated[str, InjectedToolCallId]
+        model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    async def _impl(
+        tool_call_id: Annotated[str, InjectedToolCallId]
+    ) -> Command:
+        """List all datasets in the sandbox."""
+        try:
+            from ..config import Config, DatasetAccess
+        except ImportError:
+            from config import Config, DatasetAccess
+        
+        # Load configuration to determine dataset access mode
+        cfg = Config.from_env()
+        session_key = session_key_fn()
+        
+        # Start the session if not already started
+        session_manager.start(session_key)
+        
+        # Determine the path to list based on dataset access mode
+        if cfg.dataset_access == DatasetAccess.API:
+            # API mode: list files in /session/data
+            list_path = "/session/data"
+            mode_description = "API mode (loaded datasets)"
+        elif cfg.dataset_access == DatasetAccess.LOCAL_RO:
+            # LOCAL_RO mode: list files in /data
+            list_path = "/data"
+            mode_description = "LOCAL_RO mode (statically mounted files)"
+        else:
+            # NONE mode: no datasets available
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            content="No datasets available - sandbox is in NONE mode",
+                            tool_call_id=tool_call_id,
+                        )
+                    ]
+                }
+            )
+        
+        # Execute code to list files in the appropriate directory
+        list_code = f"""
+import os
+import json
+from pathlib import Path
+
+list_path = "{list_path}"
+files = []
+
+if os.path.exists(list_path):
+    for item in os.listdir(list_path):
+        item_path = os.path.join(list_path, item)
+        if os.path.isfile(item_path):
+            stat = os.stat(item_path)
+            files.append({{
+                "name": item,
+                "path": item_path,
+                "size": stat.st_size,
+                "modified": stat.st_mtime
+            }})
+        elif os.path.isdir(item_path):
+            files.append({{
+                "name": item + "/",
+                "path": item_path,
+                "type": "directory"
+            }})
+else:
+    files = []
+
+result = {{
+    "mode": "{mode_description}",
+    "path": list_path,
+    "files": files,
+    "count": len([f for f in files if not f.get("type") == "directory"])
+}}
+
+print(json.dumps(result, indent=2))
+"""
+        
+        # Execute the listing code
+        result = session_manager.exec(session_key, list_code, timeout=10)
+        
+        if result.get("error"):
+            content = f"Error listing datasets: {result['error']}"
+        else:
+            content = f"Datasets in {mode_description}:\n\n{result.get('stdout', 'No output')}"
+        
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content=content,
+                        tool_call_id=tool_call_id,
+                    )
+                ]
+            }
+        )
+    
+    # Return a LangChain Tool by applying the decorator at factory time
+    return tool(
+        name_or_callable=name,
+        description=description,
+        args_schema=ListDatasetsArgs,
+    )(_impl)
