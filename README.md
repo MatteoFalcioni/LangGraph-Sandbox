@@ -181,6 +181,46 @@ python main.py
 - Memory-based caching
 - Multi-tenant ready
 
+## Tool Factory 
+
+The system provides **production-ready LangGraph tools** out of the box through simple factory functions. These tools handle all the complexity of container management, session persistence, and artifact processing automatically.
+
+### 🚀 **Ready-to-Use Tools**
+
+**`make_code_sandbox_tool`** - Execute Python code with persistent state
+- Maintains variables and imports across executions
+- Automatic artifact detection and ingestion
+- Memory cleanup to prevent container bloat
+- Session-pinned containers for consistency
+
+**`make_select_dataset_tool`** - Load datasets on-demand (**only in API mode**)
+- Fetches datasets from your API sources
+- Stages them directly into the sandbox
+- Smart caching with PENDING/LOADED/FAILED status tracking
+- Client wrapper pattern for easy integration *(note)[]
+
+**`make_export_datasets_tool`** - Export modified datasets to host filesystem
+- Timestamped exports to prevent overwrites
+- Automatic artifact ingestion for download URLs
+- Works with any file in `/session/data/`
+
+Instead of writing custom tool implementations, you get:
+- **Zero boilerplate**: Just call the factory with your dependencies
+- **Battle-tested**: Handles edge cases, timeouts, and error recovery
+- **Consistent**: Same patterns across all your LangGraph applications
+- **Extensible**: Easy to customize with your own fetch functions and clients
+
+```python
+# Example: Create tools in 3 lines
+code_tool = make_code_sandbox_tool(session_manager=sm, session_key_fn=get_session)
+dataset_tool = make_select_dataset_tool(session_manager=sm, fetch_fn=my_fetch, client=my_client)
+export_tool = make_export_datasets_tool(session_manager=sm, session_key_fn=get_session)
+``` 
+
+> **Note:** Notice that the `make_select_dataset_tool` expects the `fetch_fn` parameter to be a function that, given your dataset_id, returns the dataset **bytes** through your API client. 
+>
+> If in your implementation you need to pass your API `client` to the `select_dataset` tool (as we did in our [custom example](usage_examples\tmpfs_api\ex3_graph\tools.py)), you can do so by simply specifing the `client` as an input parameter. It will be automatically wrapped without any needed changes. 
+
 ## Artifact System
 
 Files saved to `/session/artifacts/` are automatically processed:
@@ -256,13 +296,6 @@ python src/sandbox/session_viewer.py sessions/<session_id> --no-state --no-artif
 - **Artifact tracking**: Monitor file creation and processing
 - **Container information**: Track container lifecycle and configuration
 - **Performance analysis**: Execution timing and resource usage
-
-### Available Tools
-
-The system provides two main tools:
-
-1. **`code_sandbox`**: Execute Python code with persistent state
-2. **`export_datasets`**: Export modified datasets to host filesystem
 
 
 ### Docker Image
