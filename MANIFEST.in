@@ -7,3 +7,5 @@ include example.env
 include docker.env
 recursive-include usage_examples *
 recursive-include src *
+recursive-include langgraph_sandbox/setup *
+recursive-include langgraph_sandbox/sandbox *

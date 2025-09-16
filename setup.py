@@ -48,7 +48,12 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
     ],
-    # Entry points removed - users can run python langgraph_sandbox/main.py directly
+    entry_points={
+        "console_scripts": [
+            "langgraph-sandbox=langgraph_sandbox.main:main",
+            "sandbox-setup=langgraph_sandbox.setup:setup_sandbox",
+        ],
+    },
     include_package_data=True,
     package_data={
         "langgraph_sandbox.setup": ["*.env", "Dockerfile"],

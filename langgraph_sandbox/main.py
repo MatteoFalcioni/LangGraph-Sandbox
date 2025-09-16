@@ -42,6 +42,10 @@ except ImportError:
 def main():
     """Main entry point for the LangGraph Sandbox."""
     
+    import argparse
+    parser = argparse.ArgumentParser(description="LangGraph Sandbox - Interactive Code Execution Environment")
+    args = parser.parse_args()
+    
     print("🐳 LangGraph Sandbox - Interactive Code Execution Environment")
     print("=" * 60)
     
@@ -73,7 +77,7 @@ def main():
     print(f"✅ Starting new session: {convo_id}")
     
     # Create session manager
-    from sandbox.session_manager import SessionManager
+    from .sandbox.session_manager import SessionManager
     session_manager = SessionManager(
         image=cfg.sandbox_image,
         session_storage=cfg.session_storage,
@@ -87,7 +91,7 @@ def main():
     def get_session_key():
         return convo_id
     
-    from tool_factory.make_tools import make_code_sandbox_tool, make_export_datasets_tool
+    from .tool_factory.make_tools import make_code_sandbox_tool, make_export_datasets_tool
     code_exec_tool = make_code_sandbox_tool(
         session_manager=session_manager,
         session_key_fn=get_session_key

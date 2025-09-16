@@ -48,7 +48,9 @@ dev = [
     "mypy",
 ]
 
-# Entry points removed - users can run python langgraph_sandbox/main.py directly
+[project.scripts]
+langgraph-sandbox = "langgraph_sandbox.main:main"
+sandbox-setup = "langgraph_sandbox.setup:setup_sandbox"
 
 [tool.setuptools.packages.find]
 include = ["*"]

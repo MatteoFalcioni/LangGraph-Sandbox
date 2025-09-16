@@ -432,7 +432,7 @@ export_tool = make_export_datasets_tool(session_manager=sm, session_key_fn=get_s
 list_tool = make_list_datasets_tool(session_manager=sm, session_key_fn=get_session_key)
 ```
 
-> **Session Key Management:** The `session_key_fn` parameter is crucial for maintaining session isolation. Each unique session key gets its own container, so implement proper session management in your application (e.g., user ID, conversation ID, or thread ID). 
+> **Session Key Management:** The `session_key_fn` parameter is crucial for maintaining session isolation. Each unique session key gets its own container, so implement proper session management in your application (e.g., user ID, conversation ID, or thread ID). You can see in our example that we did it in main by generating a random session key.
 
 > **Note:** Notice that the `make_select_dataset_tool` expects the `fetch_fn` parameter to be a function that, given your dataset_id, returns the dataset **bytes** through your API client. 
 >
