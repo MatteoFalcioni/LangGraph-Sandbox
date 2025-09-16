@@ -1,6 +1,4 @@
 blobstore
-build
-dist
 example_llm_data
 langgraph_sandbox
 tests

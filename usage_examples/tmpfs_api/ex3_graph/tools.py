@@ -27,21 +27,11 @@ def get_session_key():
         return "conv"
     return _current_session_id
 
+# do we need this? 
 def set_session_id(session_id: str):
     """Set the current session ID for the code execution tool."""
     global _current_session_id
     _current_session_id = session_id
-
-
-def extract_artifact_references(text: str) -> List[str]:
-    """
-    Extract artifact references from text that might contain artifact IDs.
-    Looks for patterns like 'art_...' or mentions of artifacts.
-    """
-    # Look for artifact ID patterns (assuming they start with 'art_')
-    artifact_pattern = r'art_[a-zA-Z0-9_-]+'
-    matches = re.findall(artifact_pattern, text)
-    return list(set(matches))  # Remove duplicates
 
 
 client = BolognaOpenData()  # close it in main then
