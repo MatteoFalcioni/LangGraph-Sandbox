@@ -56,39 +56,51 @@ def make_code_sandbox_tool(
         code: Annotated[str, "Python code to run"],
         tool_call_id: Annotated[str, InjectedToolCallId],
     ) -> Command:
+
+        # Load configuration
+        try:
+            from ..config import Config
+        except ImportError:
+            from config import Config
+        cfg = Config.from_env()
+        
         sid = session_key_fn()
         session_manager.start(sid)
 
         # Execute code - no dataset loading here anymore
         result = session_manager.exec(sid, code, timeout=timeout_s)
 
-        artifacts = result.get("artifacts", [])
-        
-        # Include artifact information in the content for the agent
-        artifact_info = ""
-        if artifacts:
-            artifact_info = "\n\n📁 Generated Artifacts:\n"
-            for artifact in artifacts:
-                filename = artifact.get('name', 'unknown')
-                size = artifact.get('size', 0)
-                mime = artifact.get('mime', 'unknown')
-                download_url = artifact.get('url', '')
-                artifact_info += f"  • {filename} ({mime}, {size} bytes)\n"
-                if download_url:
-                    artifact_info += f"    Download: {download_url}\n"
-            artifact_info += "\n"
-        
         payload = {
             "stdout": result.get("stdout", ""),
             "stderr": result.get("error", "") or result.get("stderr", ""),
             "session_dir": result.get("session_dir", ""),
         }
 
-        # Combine stdout with artifact information
-        combined_content = result.get("stdout", "") + artifact_info + json.dumps(payload, ensure_ascii=False, indent=2)
+        artifacts = result.get("artifacts", [])
+        
+        # IF configs specify it (in_chat_url=True), include the artifact information in the content for the agent
+        if cfg.in_chat_url:
+            artifact_info = ""
+            if artifacts:
+                artifact_info = "\n\n📁 Generated Artifacts:\n"
+                for artifact in artifacts:
+                    filename = artifact.get('name', 'unknown')
+                    size = artifact.get('size', 0)
+                    mime = artifact.get('mime', 'unknown')
+                    download_url = artifact.get('url', '')
+                    artifact_info += f"  • {filename} ({mime}, {size} bytes)\n"
+                    if download_url:
+                        artifact_info += f"    Download: {download_url}\n"
+                artifact_info += "\n"
+
+            # Combine stdout with artifact information
+            content = result.get("stdout", "") + artifact_info + json.dumps(payload, ensure_ascii=False, indent=2)
+
+        else:
+            content = json.dumps(payload, ensure_ascii=False, indent=2)
 
         tool_msg = ToolMessage(
-            content=combined_content,
+            content=content,
             artifact=artifacts,
             tool_call_id=tool_call_id,
         )

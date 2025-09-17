@@ -38,6 +38,9 @@ class Config:
     sandbox_image: str = "sandbox:latest"
     tmpfs_size_mb: int = 1024  # only used when SessionStorage=TMPFS
 
+    # --- artifact display options ---
+    in_chat_url: bool = False  # Include artifact URLs directly in chat content
+
     # --- in-container canonical paths (do not change lightly) ---
     container_session_path: str = "/session"
     container_data_staged: str  = "/session/data"  # for API
@@ -159,6 +162,7 @@ class Config:
           - CACHE_FILENAME  = cache_datasets.json     (default: cache_datasets.json)
           - SANDBOX_IMAGE   = sandbox:latest
           - TMPFS_SIZE_MB   = 1024
+          - IN_CHAT_URL     = true | false           (default: false)
         """
         # Load environment variables from file if provided
         env_vars = cls._load_env_file(env_file_path)
@@ -175,6 +179,7 @@ class Config:
         cache_filename  = cls._get_env_value("CACHE_FILENAME", "cache_datasets.json", env_vars)
         sandbox_image   = cls._get_env_value("SANDBOX_IMAGE", "sandbox:latest", env_vars)
         tmpfs_size_mb   = int(cls._get_env_value("TMPFS_SIZE_MB", "1024", env_vars))
+        in_chat_url     = cls._get_env_value("IN_CHAT_URL", "false", env_vars).lower() in ("true", "1", "yes")
 
         # Basic validation
         if dataset_access == DatasetAccess.LOCAL_RO:
@@ -194,6 +199,7 @@ class Config:
             cache_filename=cache_filename,
             sandbox_image=sandbox_image,
             tmpfs_size_mb=tmpfs_size_mb,
+            in_chat_url=in_chat_url,
         )
 
 if __name__ == "__main__":

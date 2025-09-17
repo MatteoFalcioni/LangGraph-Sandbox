@@ -18,6 +18,7 @@ import uuid
 import threading
 import time
 from pathlib import Path
+from datetime import datetime
 
 from langgraph.checkpoint.memory import InMemorySaver
 from dotenv import load_dotenv
@@ -191,11 +192,38 @@ def main():
             # Run the conversation
             import asyncio
             async def run_conversation():
+                artifacts_log = []
                 async for chunk in graph.astream(
                     {"messages": [{"role": "user", "content": usr_msg}]},
                     {"configurable": {"thread_id": convo_id}, "recursion_limit": 25},
                 ):
                     print(f"AI: {chunk['chat_model']['messages'][-1].content}")
+                    
+                    # Collect artifacts from tool messages
+                    for message in chunk.get('chat_model', {}).get('messages', []):
+                        if hasattr(message, 'artifact') and message.artifact:
+                            artifacts_log.extend(message.artifact)
+                
+                # Handle artifacts if not displayed in chat
+                if artifacts_log and not cfg.in_chat_url:
+                    artifact_log_path = Path("./artifact_logs") / f"{convo_id}_artifacts.txt"
+                    artifact_log_path.parent.mkdir(exist_ok=True)
+                    
+                    with open(artifact_log_path, "a", encoding="utf-8") as f:
+                        f.write(f"\n=== {datetime.now().isoformat()} ===\n")
+                        f.write(f"User: {usr_msg}\n")
+                        f.write("Generated Artifacts:\n")
+                        for artifact in artifacts_log:
+                            filename = artifact.get('name', 'unknown')
+                            size = artifact.get('size', 0)
+                            mime = artifact.get('mime', 'unknown')
+                            download_url = artifact.get('url', '')
+                            f.write(f"  • {filename} ({mime}, {size} bytes)\n")
+                            if download_url:
+                                f.write(f"    Download: {download_url}\n")
+                        f.write("\n")
+                    
+                    print(f"\n📁 {len(artifacts_log)} artifact(s) logged to: {artifact_log_path}")
             
             asyncio.run(run_conversation())
             print()  # New line after response

@@ -881,13 +881,11 @@ if session_artifacts.exists():
         host_path = host_dir / host_filename
         
         try:
-            # Extract file from container
-            stream, _ = container.get_archive(container_path)
+            # Extract file from container using robust method
+            host_file = self._copy_from_container(container, container_path, host_dir)
             
-            # Write to host filesystem
-            with open(host_path, 'wb') as f:
-                for chunk in stream:
-                    f.write(chunk)
+            # Move to final location with timestamp
+            host_file.rename(host_path)
             
             # Create a temporary copy for artifact ingestion (since ingest_files deletes the original)
             import tempfile
