@@ -291,6 +291,9 @@ DATASETS_HOST_RO=./example_llm_data
 # Docker settings
 SANDBOX_IMAGE=sandbox:latest
 TMPFS_SIZE_MB=1024
+
+# Artifact display options
+IN_CHAT_URL=false  # Show artifact URLs in chat (true) or log to file (false)
 ```
 
 ### Quick Configuration Examples
@@ -312,6 +315,25 @@ data python main.py
 **Production (default):**
 ```bash
 langgraph-sandbox
+```
+
+### Artifact Display Options
+
+The `IN_CHAT_URL` setting controls how generated artifacts (plots, files, etc.) are displayed:
+
+- **`IN_CHAT_URL=false` (default)**: Artifacts are logged to `./artifact_logs/{conversation_id}_artifacts.txt` with download URLs. Clean chat interface without artifact clutter.
+
+- **`IN_CHAT_URL=true`**: Artifacts are displayed directly in the chat with download links. Useful for interactive sessions where you want immediate access to generated files.
+
+> **Note:** careful adding artifacts URLs to chat, because they might confuse your agent. For bigger, smarter models it's fine, but smaller models may run off track seeing urls. 
+
+Example artifact log entry:
+```
+=== 2024-01-15T10:30:45.123456 ===
+User: Create a plot of random data
+Generated Artifacts:
+  • plot.png (image/png, 15432 bytes)
+    Download: http://localhost:8000/artifacts/download/abc123?token=xyz789
 ```
 
 ## Usage Examples
