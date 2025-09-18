@@ -397,6 +397,14 @@ with open('/session/python_state.json', 'w') as f:
             return sid
         except docker.errors.NotFound:
             pass  # create a new container
+        except Exception as e:
+            # If there's any other issue with the existing container, remove it and create a new one
+            try:
+                existing = self.client.containers.get(name)
+                existing.stop()
+                existing.remove()
+            except:
+                pass  # Ignore errors when removing problematic container
 
         # Build mounts
         volumes: Dict[str, Dict[str, str]] = {}
@@ -427,6 +435,19 @@ with open('/session/python_state.json', 'w') as f:
             # Host strategy: port mapping for external access
             ports = {"9000/tcp": None}  # random host port for REPL
             network = None
+
+        # Ensure no container with this name exists before creating
+        try:
+            existing_container = self.client.containers.get(name)
+            # If we get here, a container with this name exists
+            existing_container.stop()
+            existing_container.remove()
+        except docker.errors.NotFound:
+            # No existing container, which is what we want
+            pass
+        except Exception as e:
+            # If there's any issue removing the existing container, log it but continue
+            print(f"Warning: Could not remove existing container {name}: {e}")
 
         # Run container
         container = self.client.containers.run(

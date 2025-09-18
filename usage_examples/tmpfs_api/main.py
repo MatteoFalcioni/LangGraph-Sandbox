@@ -47,16 +47,37 @@ if __name__ == "__main__":
     import threading
     import time
     
+    server_port = None
+    
     def run_server():
-        try:
-            uvicorn.run(app, host="0.0.0.0", port=8000, log_level="error")
-        except Exception as e:
-            print(f"Server error: {e}")
+        nonlocal server_port
+        ports_to_try = [8000, 8001, 8002, 8003, 8004]
+        for port in ports_to_try:
+            try:
+                server_port = port
+                uvicorn.run(app, host="0.0.0.0", port=port, log_level="error")
+                break  # Success, exit the loop
+            except OSError as e:
+                if "address already in use" in str(e).lower():
+                    if port == ports_to_try[0]:  # Only show warning for first attempt
+                        print(f"⚠️  Port {port} is already in use (likely by Docker Compose), trying alternative port...")
+                    continue  # Try next port
+                else:
+                    print(f"Server error: {e}")
+                    break
+            except Exception as e:
+                print(f"Server error: {e}")
+                break
     
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
     time.sleep(2)  # Give the server time to start
-    print("Artifact server started on http://localhost:8000")
+    
+    # Report the actual port used
+    if server_port:
+        print(f"Artifact server started on http://localhost:{server_port}")
+    else:
+        print("Artifact server started")
 
     builder = get_builder()
 

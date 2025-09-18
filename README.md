@@ -301,7 +301,7 @@ IN_CHAT_URL=false  # Show artifact URLs in chat (true) or log to file (false)
 
 # Network configuration (for Docker Compose)
 SANDBOX_ADDRESS_STRATEGY=container  # "container" for Docker network DNS, "host" for port mapping
-COMPOSE_NETWORK=myapp_network      # Docker network name (optional)
+COMPOSE_NETWORK=langgraph-network  # Docker network name (optional)
 HOST_GATEWAY=host.docker.internal  # Gateway hostname for host strategy
 ```
 

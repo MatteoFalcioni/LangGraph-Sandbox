@@ -31,7 +31,9 @@ def cleanup_sandbox_containers(container_prefix: str = "sbox-", verbose: bool = 
         
         for container in containers:
             try:
-                container.stop()
+                # Only stop if container is running
+                if container.status == "running":
+                    container.stop()
                 container.remove()
                 removed_containers.append(container.name)
                 if verbose:

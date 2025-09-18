@@ -58,9 +58,16 @@ def create_download_url(artifact_id: str) -> str:
     Build a ready-to-click URL for the artifact:
       {PUBLIC_BASE_URL}/artifacts/{id}?token=...
     
-    Uses ARTIFACTS_PUBLIC_BASE_URL if set, otherwise defaults to localhost:8000
+    Uses ARTIFACTS_PUBLIC_BASE_URL if set, otherwise defaults to localhost with dynamic port
     """
-    base = os.getenv("ARTIFACTS_PUBLIC_BASE_URL", "http://localhost:8000")
+    # Check for custom base URL first
+    base = os.getenv("ARTIFACTS_PUBLIC_BASE_URL")
+    if base:
+        base = base.rstrip("/")
+    else:
+        # Use dynamic port from environment, fallback to 8000
+        port = os.getenv("ARTIFACTS_SERVER_PORT", "8000")
+        base = f"http://localhost:{port}"
+    
     token = create_token(artifact_id)
-    base = base.rstrip("/")
     return f"{base}/artifacts/{artifact_id}?token={token}"
