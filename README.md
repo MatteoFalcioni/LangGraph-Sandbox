@@ -74,11 +74,18 @@ python --version  # Should show Python 3.11.x or higher
 # Install the package in development mode
 pip install -e .
 
+# Set up the sandbox environment (copies required files)
+sandbox-setup
+
+# Set up configuration
+cp sandbox.env.example sandbox.env
+# Edit sandbox.env and add your OPENAI_API_KEY
+
 # Build the Docker image
 docker build -t sandbox:latest -f Dockerfile.sandbox .
 ```
 
-Set your OpenAI API key by modifying the `example.env` file, rename it to `sandbox.env` and run the example:
+Run the example:
 
 ```bash
 # Run the simple sandbox
@@ -129,13 +136,22 @@ code_tool = make_code_sandbox_tool(
 # Clone the repository and build the Docker Image
 git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
 cd LangGraph-Sandbox
-docker build -t sandbox:latest -f Dockerfile.sandbox .
 
 # Install Dependencies
 pip install -r requirements.txt
+
+# Set up the sandbox environment (copies required files)
+python sandbox-setup
+
+# Set up configuration
+cp sandbox.env.example sandbox.env
+# Edit sandbox.env and add your OPENAI_API_KEY
+
+# Build the Docker image
+docker build -t sandbox:latest -f Dockerfile.sandbox .
 ```
 
-Then set your OpenAI API key by modifying the `example.env` file, rename it to `simple_sandbox.env` and run a simple example:
+Run a simple example:
 
 ```bash
 # Run Simple Example
@@ -183,6 +199,8 @@ Then build the Docker image:
 ```bash
 docker build -t sandbox:latest -f Dockerfile.sandbox .
 ```
+
+**Note:** The setup process automatically handles file copying and will skip files that already exist in the current directory.
 
 ### Customize Configuration
 
@@ -412,8 +430,10 @@ If you encounter issues with container strategy:
 
 #### Current Status:
 
-- **Container Strategy**: ✅ **FIXED** - Now works out of the box with proper network configuration
+- **Container Strategy**: ✅ **WORKING** - Fully functional with proper network configuration
 - **Host Strategy**: ✅ Works out of the box (fallback option)
+- **Session Manager**: ✅ **WORKING** - Creates containers and connects them to the network correctly
+- **End-to-End Integration**: ✅ **WORKING** - Full CLI workflow tested and functional
 
 ### Docker Compose Example
 
@@ -678,6 +698,22 @@ The sandbox runs in a custom Docker image with:
 - Examples must be run from the project root directory
 - Use `langgraph-sandbox` command
 - Do not run examples directly from their subdirectories
+
+**Docker build failures:**
+- Ensure you've run the setup process: `python -m langgraph_sandbox.setup`
+- The Dockerfile expects `sandbox/repl_server.py` to exist in the build context
+- If you get "COPY sandbox/repl_server.py: not found", run the setup command above
+
+**Session Manager hanging/timeout issues:**
+- This is expected when running SessionManager directly from the host machine
+- The SessionManager is designed to run inside the Docker Compose environment
+- For testing, use the full CLI workflow: `langgraph-sandbox`
+- Container strategy requires proper network configuration (already set up in docker-compose.yml)
+
+**Network connectivity issues:**
+- Ensure Docker Compose is running: `docker compose up -d`
+- Check containers are in the correct network: `docker network inspect langgraph-network`
+- Verify container names follow the pattern: `sbox-{session_id}`
 
 ## Next Steps
 

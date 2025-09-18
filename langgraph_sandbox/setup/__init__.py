@@ -45,8 +45,12 @@ def setup_sandbox():
         destination = current_dir / filename
         
         if source.exists():
-            shutil.copy2(source, destination)
-            print(f"✓ Copied {filename}")
+            # Skip if source and destination are the same file (already in project root)
+            if source.resolve() == destination.resolve():
+                print(f"✓ {filename} already exists in current directory")
+            else:
+                shutil.copy2(source, destination)
+                print(f"✓ Copied {filename}")
         else:
             print(f"✗ Warning: {filename} not found in project root")
     
@@ -56,8 +60,12 @@ def setup_sandbox():
         destination = current_dir / filename
         
         if source.exists():
-            shutil.copy2(source, destination)
-            print(f"✓ Copied {filename}")
+            # Skip if source and destination are the same file (already in project root)
+            if source.resolve() == destination.resolve():
+                print(f"✓ {filename} already exists in current directory")
+            else:
+                shutil.copy2(source, destination)
+                print(f"✓ Copied {filename}")
         else:
             print(f"✗ Warning: {filename} not found in package")
     
@@ -66,10 +74,14 @@ def setup_sandbox():
         destination = current_dir / dirname
         
         if source.exists():
-            if destination.exists():
-                shutil.rmtree(destination)
-            shutil.copytree(source, destination)
-            print(f"✓ Copied {dirname}/ directory")
+            # Skip if source and destination are the same directory (already in project root)
+            if source.resolve() == destination.resolve():
+                print(f"✓ {dirname}/ directory already exists in current directory")
+            else:
+                if destination.exists():
+                    shutil.rmtree(destination)
+                shutil.copytree(source, destination)
+                print(f"✓ Copied {dirname}/ directory")
         else:
             print(f"✗ Warning: {dirname}/ directory not found in package")
     

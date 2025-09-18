@@ -170,7 +170,44 @@ class SessionManager:
             return f"http://{container_name}:9000"
         else:
             # Use host gateway with mapped port
-            return f"http://{self.host_gateway}:{info.host_port}"
+            # Auto-detect the right host gateway for the environment
+            host_gateway = self._detect_host_gateway()
+            return f"http://{host_gateway}:{info.host_port}"
+
+    def _detect_host_gateway(self) -> str:
+        """
+        Detect the appropriate host gateway based on the environment.
+        
+        Returns:
+            The host gateway to use for connecting to containers.
+        """
+        # If explicitly configured, use that
+        if self.host_gateway != "host.docker.internal":
+            return self.host_gateway
+        
+        # Auto-detect environment
+        import platform
+        import os
+        
+        # Check if we're in WSL2
+        if "microsoft" in platform.uname().release.lower():
+            return "localhost"
+        
+        # Check if we're in a container (Docker-in-Docker)
+        if os.path.exists("/.dockerenv"):
+            return "host.docker.internal"
+        
+        # Check if host.docker.internal is reachable
+        try:
+            import socket
+            socket.gethostbyname("host.docker.internal")
+            return "host.docker.internal"
+        except socket.gaierror:
+            # Fallback to localhost
+            return "localhost"
+        
+        # Default fallback
+        return "localhost"
 
     def _write_session_log(self, session_key: str, log_entry: dict) -> None:
         """
