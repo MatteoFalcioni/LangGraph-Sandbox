@@ -43,7 +43,7 @@ class Config:
 
     # --- network configuration ---
     sandbox_address_strategy: str = "container"  # "container" or "host"
-    compose_network: Optional[str] = None
+    compose_network: Optional[str] = "langgraph-network"
     host_gateway: str = "host.docker.internal"
 
     # --- in-container canonical paths (do not change lightly) ---
@@ -204,7 +204,7 @@ class Config:
         
         # Network configuration
         sandbox_address_strategy = cls._get_env_value("SANDBOX_ADDRESS_STRATEGY", "container", env_vars)
-        compose_network = cls._get_env_value("COMPOSE_NETWORK", None, env_vars)
+        compose_network = cls._get_env_value("COMPOSE_NETWORK", "langgraph-network", env_vars)
         host_gateway = cls._get_env_value("HOST_GATEWAY", "host.docker.internal", env_vars)
 
         # Basic validation

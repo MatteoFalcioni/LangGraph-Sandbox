@@ -28,7 +28,7 @@ services:
       - "8000:8000"  # Artifacts API
     stdin_open: true
     tty: true
-    command: tail -f /dev/null  # Keep container running
+    # command: tail -f /dev/null  # Keep container running - commented out to use default CMD from Dockerfile
 
 networks:
   langgraph-network:

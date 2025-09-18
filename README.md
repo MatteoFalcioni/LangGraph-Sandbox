@@ -351,18 +351,7 @@ The `IN_CHAT_URL` setting controls how generated artifacts (plots, files, etc.) 
 
 ### Network Configuration
 
-For Docker Compose deployments, configure network access:
-
-**Container Strategy** (recommended for compose):
-```env
-SANDBOX_ADDRESS_STRATEGY=container
-COMPOSE_NETWORK=your_app_network
-```
-- Containers communicate via Docker network DNS
-- No port mapping needed
-- URL: `http://sbox-{session_id}:9000`
-
-**Host Strategy** (fallback):
+**Host Strategy** (default):
 ```env
 SANDBOX_ADDRESS_STRATEGY=host
 HOST_GATEWAY=host.docker.internal
@@ -370,6 +359,61 @@ HOST_GATEWAY=host.docker.internal
 - Uses host port mapping and gateway
 - Compatible with traditional deployment
 - URL: `http://host.docker.internal:{mapped_port}`
+- **This is the default configuration** - works out of the box
+
+**Container Strategy** (for Docker Compose deployments):
+```env
+SANDBOX_ADDRESS_STRATEGY=container
+COMPOSE_NETWORK=your_app_network
+```
+- Containers communicate via Docker network DNS
+- No port mapping needed
+- URL: `http://sbox-{session_id}:9000`
+- Requires proper Docker network setup (see Docker Compose Setup below)
+
+### Docker Compose Setup
+
+The project includes a `docker-compose.yml` file with **pre-configured networking** for the container strategy:
+
+#### ✅ Container Strategy Networking (Already Configured):
+
+The `docker-compose.yml` file already includes:
+- Custom Docker network: `langgraph-network`
+- Proper network configuration for container strategy
+- Default environment variables set correctly
+
+**No additional setup required** - the container strategy should work out of the box.
+
+#### Manual Network Creation (if needed):
+
+If you encounter network issues, you can manually create the network:
+```bash
+docker network create langgraph-network
+```
+
+#### Troubleshooting Container Strategy:
+
+If you encounter issues with container strategy:
+
+1. **Check if network exists:**
+   ```bash
+   docker network ls | grep langgraph-network
+   ```
+
+2. **Verify container is in correct network:**
+   ```bash
+   docker inspect sbox-{session_id} | grep -A 10 "Networks"
+   ```
+
+3. **Test connectivity from main app:**
+   ```bash
+   docker exec -it {main_app_container} curl http://sbox-{session_id}:9000/health
+   ```
+
+#### Current Status:
+
+- **Container Strategy**: ✅ **FIXED** - Now works out of the box with proper network configuration
+- **Host Strategy**: ✅ Works out of the box (fallback option)
 
 ### Docker Compose Example
 
@@ -488,7 +532,7 @@ Instead of writing custom tool implementations, you get:
 ```python
 # Example: Create tools in 4 lines
 def get_session_key():
-    return "my_session_id"  # Implement your session management logic
+    return "my_session_id"  # Implement your session management logic if needed
 
 code_tool = make_code_sandbox_tool(session_manager=sm, session_key_fn=get_session_key)
 dataset_tool = make_select_dataset_tool(session_manager=sm, fetch_fn=my_fetch, client=my_client)
@@ -500,7 +544,7 @@ list_tool = make_list_datasets_tool(session_manager=sm, session_key_fn=get_sessi
 
 > **Note:** Notice that the `make_select_dataset_tool` expects the `fetch_fn` parameter to be a function that, given your dataset_id, returns the dataset **bytes** through your API client. 
 >
-> If in your implementation you need to pass your API `client` to the `select_dataset` tool (as we did in our [custom example](usage_examples\tmpfs_api\ex3_graph\tools.py)), you can do so by simply specifing the `client` as an input parameter. It will be automatically wrapped without any needed changes. 
+> If in your implementation **you need to pass your API `client` to the `select_dataset` tool** (as we did in our [custom example](usage_examples\tmpfs_api\ex3_graph\tools.py)), you can do so by simply specifing `client` as an input parameter. It will be automatically wrapped without any needed changes. 
 
 ## Artifact System
 

@@ -1,4 +1,4 @@
-# .env.example — copy to .env or pass with --env-file
+# .env.example — copy to sandbox.env 
 
 # --- Core knobs ---
 SESSION_STORAGE=TMPFS        # TMPFS | BIND
@@ -20,7 +20,7 @@ TMPFS_SIZE_MB=1024
 IN_CHAT_URL=false            # true | false (default: false)
 
 # --- Network configuration (for Docker Compose) ---
-SANDBOX_ADDRESS_STRATEGY=container  # "container" for Docker network DNS, "host" for port mapping
+SANDBOX_ADDRESS_STRATEGY=host  # "container" for Docker network DNS, "host" for port mapping
 COMPOSE_NETWORK=langgraph-network  # Docker network name (optional)
 HOST_GATEWAY=host.docker.internal  # Gateway hostname for host strategy
 
