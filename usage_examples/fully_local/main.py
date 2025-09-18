@@ -31,12 +31,6 @@ from langgraph_sandbox.artifacts.reader import fetch_artifact_urls
 if __name__ == "__main__":
 
     app = FastAPI()
-
-    env = load_dotenv("fully_local.env")
-    if env == True: 
-        print("Loaded .env file")
-    else:
-        print("No .env file found")
     
     ensure_artifact_store() # bootstrap storage using environment variables
 

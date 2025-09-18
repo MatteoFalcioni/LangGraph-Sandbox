@@ -182,6 +182,12 @@ class Config:
         
         env_vars = cls._load_env_file(env_file_path)
         
+        # Set all loaded environment variables in the system environment
+        # This ensures that libraries like langchain can access them (e.g., OPENAI_API_KEY)
+        for key, value in env_vars.items():
+            if key not in os.environ:  # Don't override existing env vars
+                os.environ[key] = value
+        
         session_storage = cls._get_env_enum("SESSION_STORAGE", SessionStorage, SessionStorage.TMPFS, env_vars)
         dataset_access  = cls._get_env_enum("DATASET_ACCESS",  DatasetAccess,  DatasetAccess.API, env_vars)
 

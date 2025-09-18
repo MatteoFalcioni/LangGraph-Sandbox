@@ -23,17 +23,10 @@ from langgraph_sandbox.config import Config
 from ex2_graph.simple_ex_graph import get_builder
 from ex2_graph.tools import set_session_id
 from langgraph_sandbox.sandbox.container_utils import cleanup_sandbox_containers
-from langgraph_sandbox.artifacts.reader import fetch_artifact_urls
 
 def main():
     app = FastAPI()
 
-    env = load_dotenv("simple_sandbox.env")
-    if env == True: 
-        print("Loaded .env file")
-    else:
-        print("No .env file found")
-    
     ensure_artifact_store() # bootstrap storage using environment variables
 
     cfg = Config.from_env(env_file_path=Path("simple_sandbox.env"))

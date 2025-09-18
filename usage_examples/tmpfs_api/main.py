@@ -1,5 +1,3 @@
-# Set environment variables to use tmpfs_api database and blobstore
-# This must be done before any imports that use the artifact system
 import os
 import sys
 from pathlib import Path
@@ -27,12 +25,6 @@ from langgraph_sandbox.sandbox.container_utils import cleanup_sandbox_containers
 if __name__ == "__main__":
 
     app = FastAPI()
-
-    env = load_dotenv("tmpfs_api.env")
-    if env == True: 
-        print("Loaded .env file")
-    else:
-        print("No .env file found")
     
     ensure_artifact_store() # bootstrap storage using environment variables
 
