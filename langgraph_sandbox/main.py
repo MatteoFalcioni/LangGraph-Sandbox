@@ -53,8 +53,8 @@ def main():
     # Load environment configuration
     env_file = Path("sandbox.env")
     if not env_file.exists():
-        env_file = Path("example.env")
-        print("(❗) No sandbox.env file found, using example.env - you should rename it to sandbox.env and fill in the OpenAI API key")
+        env_file = Path("sandbox.env.example")
+        print("(❗) No sandbox.env file found, using sandbox.env.example - you should copy it to sandbox.env and fill in the OpenAI API key")
     
     env_loaded = load_dotenv(env_file)
     if env_loaded:

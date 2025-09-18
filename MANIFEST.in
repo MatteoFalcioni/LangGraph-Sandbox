@@ -3,8 +3,7 @@ include requirements.txt
 include pyproject.toml
 include setup.py
 include Dockerfile
-include example.env
-include docker.env
+include sandbox.env.example
 recursive-include usage_examples *
 recursive-include src *
 recursive-include langgraph_sandbox/setup *

@@ -94,7 +94,6 @@ def setup_sandbox():
     print("  langgraph-sandbox  # Run this command on the HOST machine")
     print("  # OR Traditional Docker:")
     print("  docker build -t sandbox:latest -f Dockerfile.sandbox .")
-    print("  docker run -p 8000:8000 sandbox:latest")
     print("  langgraph-sandbox  # Run this command on the HOST machine")
 
 
