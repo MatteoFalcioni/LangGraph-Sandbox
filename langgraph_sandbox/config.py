@@ -154,8 +154,9 @@ class Config:
         Load configuration from environment variables, optionally from a file.
         
         Args:
-            env_file_path: Optional path to environment file. If provided, variables
-                         from the file take precedence over system environment variables.
+            env_file_path: Optional path to environment file. If None, looks for 'sandbox.env' 
+                         in current directory. If provided, variables from the file take 
+                         precedence over system environment variables.
         
         Environment variables:
           - SESSION_STORAGE = TMPFS | BIND           (default: TMPFS)
@@ -173,6 +174,12 @@ class Config:
           - HOST_GATEWAY     = host.docker.internal     (default: host.docker.internal)
         """
         # Load environment variables from file if provided
+        if env_file_path is None:
+            # Look for sandbox.env in current directory
+            sandbox_env = Path("sandbox.env")
+            if sandbox_env.exists():
+                env_file_path = sandbox_env
+        
         env_vars = cls._load_env_file(env_file_path)
         
         session_storage = cls._get_env_enum("SESSION_STORAGE", SessionStorage, SessionStorage.TMPFS, env_vars)

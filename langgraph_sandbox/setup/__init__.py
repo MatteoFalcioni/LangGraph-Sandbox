@@ -20,9 +20,9 @@ def setup_sandbox():
     
     # Files to copy
     files_to_copy = [
-        "Dockerfile",
+        "Dockerfile.sandbox",
         "docker.env", 
-        "example.env"
+        "sandbox.env.example"
     ]
     
     # Directories to copy
@@ -55,7 +55,7 @@ def setup_sandbox():
             print(f"✗ Warning: {dirname}/ directory not found in package")
     
     print("\nSetup complete! You can now run:")
-    print("  docker build -t sandbox:latest -f Dockerfile .")
+    print("  docker build -t sandbox:latest -f Dockerfile.sandbox .")
     print("  docker run -p 8000:8000 sandbox:latest")
 
 

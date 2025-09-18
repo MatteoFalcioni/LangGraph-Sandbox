@@ -75,7 +75,7 @@ python --version  # Should show Python 3.11.x or higher
 pip install -e .
 
 # Build the Docker image
-docker build -t sandbox:latest -f Dockerfile .
+docker build -t sandbox:latest -f Dockerfile.sandbox .
 ```
 
 Set your OpenAI API key by modifying the `example.env` file, rename it to `sandbox.env` and run the example:
@@ -129,7 +129,7 @@ code_tool = make_code_sandbox_tool(
 # Clone the repository and build the Docker Image
 git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
 cd LangGraph-Sandbox
-docker build -t sandbox:latest -f Dockerfile .
+docker build -t sandbox:latest -f Dockerfile.sandbox .
 
 # Install Dependencies
 pip install -r requirements.txt
@@ -173,13 +173,15 @@ sandbox-setup
 ```
 
 This command will:
-- Copy Docker files (`Dockerfile`, `example.env`, `docker.env`) to your current directory
+- Copy Docker files (`Dockerfile.sandbox`, `sandbox.env.example`, `docker.env`) to your current directory
 - Copy the `sandbox/` directory needed for Docker build
 - Provide instructions for building the Docker image
 
+**Note:** Copy `sandbox.env.example` to `sandbox.env` and customize the settings for your environment.
+
 Then build the Docker image:
 ```bash
-docker build -t sandbox:latest -f Dockerfile .
+docker build -t sandbox:latest -f Dockerfile.sandbox .
 ```
 
 ### Customize Configuration
@@ -248,9 +250,9 @@ dataset_tool = make_select_dataset_tool(
 
 ```
 your-project/
-├── .env                    # Your configuration
-├── Dockerfile             # Copied from package
-├── example.env            # Template (copied from package) -> **rename to sandbox.env**
+├── sandbox.env            # Your configuration (copy from sandbox.env.example)
+├── Dockerfile.sandbox     # Copied from package
+├── sandbox.env.example    # Template (copied from package)
 ├── docker.env             # Alternative config (copied from package)
 ├── your_code.py           # Your Python code
 └── ...
@@ -260,7 +262,7 @@ your-project/
 
 To use a custom Docker image:
 
-1. Modify the Dockerfile in your project directory
+1. Modify the Dockerfile.sandbox in your project directory
 2. Update the `SANDBOX_IMAGE` in your `sandbox.env` file
 3. Rebuild the image:
    ```bash
