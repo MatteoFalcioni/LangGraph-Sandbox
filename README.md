@@ -294,6 +294,11 @@ TMPFS_SIZE_MB=1024
 
 # Artifact display options
 IN_CHAT_URL=false  # Show artifact URLs in chat (true) or log to file (false)
+
+# Network configuration (for Docker Compose)
+SANDBOX_ADDRESS_STRATEGY=container  # "container" for Docker network DNS, "host" for port mapping
+COMPOSE_NETWORK=myapp_network      # Docker network name (optional)
+HOST_GATEWAY=host.docker.internal  # Gateway hostname for host strategy
 ```
 
 ### Quick Configuration Examples
@@ -317,6 +322,15 @@ data python main.py
 langgraph-sandbox
 ```
 
+**Docker Compose:**
+```env
+SANDBOX_ADDRESS_STRATEGY=container
+COMPOSE_NETWORK=myapp_network
+```
+```bash
+docker-compose up
+```
+
 ### Artifact Display Options
 
 The `IN_CHAT_URL` setting controls how generated artifacts (plots, files, etc.) are displayed:
@@ -335,6 +349,28 @@ Generated Artifacts:
   • plot.png (image/png, 15432 bytes)
     Download: http://localhost:8000/artifacts/download/abc123?token=xyz789
 ```
+
+### Network Configuration
+
+For Docker Compose deployments, configure network access:
+
+**Container Strategy** (recommended for compose):
+```env
+SANDBOX_ADDRESS_STRATEGY=container
+COMPOSE_NETWORK=your_app_network
+```
+- Containers communicate via Docker network DNS
+- No port mapping needed
+- URL: `http://sbox-{session_id}:9000`
+
+**Host Strategy** (fallback):
+```env
+SANDBOX_ADDRESS_STRATEGY=host
+HOST_GATEWAY=host.docker.internal
+```
+- Uses host port mapping and gateway
+- Compatible with traditional deployment
+- URL: `http://host.docker.internal:{mapped_port}`
 
 ## Usage Examples
 

@@ -87,6 +87,9 @@ def main():
         datasets_path=cfg.datasets_host_ro,
         session_root=cfg.sessions_root,
         tmpfs_size=cfg.tmpfs_size_mb,
+        address_strategy=cfg.sandbox_address_strategy,
+        compose_network=cfg.compose_network,
+        host_gateway=cfg.host_gateway,
     )
     
     # Create tools with session key function
