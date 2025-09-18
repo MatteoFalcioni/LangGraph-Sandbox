@@ -10,7 +10,7 @@ from ex2_graph.prompt import PROMPT
 
 load_dotenv("simple_sandbox.env")
 
-llm = ChatOpenAI(model="gpt-4.1")
+llm = ChatOpenAI(model="gpt-4")
 
 coding_agent = create_react_agent(
     model=llm,

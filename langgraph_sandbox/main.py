@@ -111,14 +111,13 @@ def main():
     app.include_router(artifacts_router)
     
     # Start artifact server with port fallback
-    server_port = None
+    server_port = [None]  # Use a list to make it mutable
     
     def run_server():
-        nonlocal server_port
         ports_to_try = [8000, 8001, 8002, 8003, 8004]
         for port in ports_to_try:
             try:
-                server_port = port
+                server_port[0] = port
                 # Set the server port in environment for URL generation
                 os.environ["ARTIFACTS_SERVER_PORT"] = str(port)
                 uvicorn.run(app, host="0.0.0.0", port=port, log_level="error")
@@ -140,8 +139,8 @@ def main():
     time.sleep(2)  # Give server time to start
     
     # Report the actual port used
-    if server_port:
-        print(f"✅ Artifact server started on http://localhost:{server_port}")
+    if server_port[0]:
+        print(f"✅ Artifact server started on http://localhost:{server_port[0]}")
     else:
         print("✅ Artifact server started")
 

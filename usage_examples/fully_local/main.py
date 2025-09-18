@@ -56,14 +56,13 @@ if __name__ == "__main__":
     import threading
     import time
     
-    server_port = None
+    server_port = [None]  # Use a list to make it mutable
     
     def run_server():
-        nonlocal server_port
         ports_to_try = [8000, 8001, 8002, 8003, 8004]
         for port in ports_to_try:
             try:
-                server_port = port
+                server_port[0] = port
                 uvicorn.run(app, host="0.0.0.0", port=port, log_level="error")
                 break  # Success, exit the loop
             except OSError as e:
@@ -83,8 +82,8 @@ if __name__ == "__main__":
     time.sleep(2)  # Give the server time to start
     
     # Report the actual port used
-    if server_port:
-        print(f"Artifact server started on http://localhost:{server_port}")
+    if server_port[0]:
+        print(f"Artifact server started on http://localhost:{server_port[0]}")
     else:
         print("Artifact server started")
 
