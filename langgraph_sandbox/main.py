@@ -120,7 +120,15 @@ def main():
                 server_port[0] = port
                 # Set the server port in environment for URL generation
                 os.environ["ARTIFACTS_SERVER_PORT"] = str(port)
-                uvicorn.run(app, host="0.0.0.0", port=port, log_level="error")
+                # Suppress uvicorn's error output by redirecting stderr temporarily
+                import sys
+                from contextlib import redirect_stderr
+                from io import StringIO
+                
+                # Capture uvicorn's stderr to suppress the port error message
+                stderr_capture = StringIO()
+                with redirect_stderr(stderr_capture):
+                    uvicorn.run(app, host="0.0.0.0", port=port, log_level="error")
                 break  # Success, exit the loop
             except OSError as e:
                 if "address already in use" in str(e).lower():
@@ -214,20 +222,27 @@ def main():
             
             print("\n🤖 AI: ", end="", flush=True)
             
-            # Run the conversation
+            # Run the conversation with timeout
             import asyncio
+            
             async def run_conversation():
                 artifacts_log = []
-                async for chunk in graph.astream(
-                    {"messages": [{"role": "user", "content": usr_msg}]},
-                    {"configurable": {"thread_id": convo_id}, "recursion_limit": 25},
-                ):
-                    print(f"{chunk['chat_model']['messages'][-1].content}")
-                    
-                    # Collect artifacts from tool messages
-                    for message in chunk.get('chat_model', {}).get('messages', []):
-                        if hasattr(message, 'artifact') and message.artifact:
-                            artifacts_log.extend(message.artifact)
+                try:
+                    # Add timeout to prevent hanging
+                    async with asyncio.timeout(60):  # 60 second timeout
+                        async for chunk in graph.astream(
+                            {"messages": [{"role": "user", "content": usr_msg}]},
+                            {"configurable": {"thread_id": convo_id}, "recursion_limit": 25},
+                        ):
+                            print(f"{chunk['chat_model']['messages'][-1].content}")
+                            
+                            # Collect artifacts from tool messages
+                            for message in chunk.get('chat_model', {}).get('messages', []):
+                                if hasattr(message, 'artifact') and message.artifact:
+                                    artifacts_log.extend(message.artifact)
+                except asyncio.TimeoutError:
+                    print("\n⏰ Request timed out after 60 seconds")
+                    return
                 
                 # Handle artifacts if not displayed in chat
                 if artifacts_log and not cfg.in_chat_url:
@@ -250,7 +265,12 @@ def main():
                     
                     print(f"\n📁 {len(artifacts_log)} artifact(s) logged to: {artifact_log_path}")
             
-            asyncio.run(run_conversation())
+            # Run with proper signal handling
+            try:
+                asyncio.run(run_conversation())
+            except KeyboardInterrupt:
+                print("\n⏹️  Interrupted by user")
+                break
             print()  # New line after response
             
         except KeyboardInterrupt:
