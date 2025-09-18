@@ -2,7 +2,7 @@
 # This file is automatically loaded by docker-compose
 
 services:
-  app:
+  langgraph-sandbox:
     environment:
       # Override to use host networking for development
       SANDBOX_ADDRESS_STRATEGY: host
@@ -12,8 +12,3 @@ services:
     ports:
       - "8000:8000"  # Artifacts API
       - "9000:9000"  # Sandbox REPL (for host strategy)
-
-  sandbox:
-    # Add port mapping for host strategy
-    ports:
-      - "9001:9000"  # Sandbox REPL port

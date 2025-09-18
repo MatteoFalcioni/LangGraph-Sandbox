@@ -1,10 +1,10 @@
 services:
-  # Main application (your LangGraph app)
-  app:
+  # LangGraph Sandbox application
+  langgraph-sandbox:
     build:
       context: .
       dockerfile: Dockerfile.sandbox
-    container_name: langgraph-app
+    container_name: langgraph-sandbox
     environment:
       # Network configuration for sandbox
       SANDBOX_ADDRESS_STRATEGY: container
@@ -23,23 +23,12 @@ services:
     volumes:
       - ./sessions:/app/sessions
       - ./blobstore:/app/blobstore
+      - .:/app/workspace  # Mount current directory for your code
     ports:
       - "8000:8000"  # Artifacts API
-    depends_on:
-      - sandbox
-
-  # Sandbox container (managed by SessionManager)
-  sandbox:
-    build:
-      context: .
-      dockerfile: Dockerfile.sandbox
-    container_name: langgraph-sandbox
-    networks:
-      - langgraph-network
-    # No port mapping needed - uses container networking
-    environment:
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
+    stdin_open: true
+    tty: true
+    command: tail -f /dev/null  # Keep container running
 
 networks:
   langgraph-network:

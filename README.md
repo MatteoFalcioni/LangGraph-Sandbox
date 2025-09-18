@@ -328,8 +328,11 @@ langgraph-sandbox
 
 **Docker Compose:**
 ```bash
-# Uses container strategy by default
-docker-compose up
+# Start container
+docker-compose up -d
+
+# Run langgraph-sandbox inside container
+docker-compose exec langgraph-sandbox langgraph-sandbox
 
 # Or customize in docker-compose.yml:
 # SANDBOX_ADDRESS_STRATEGY=container
@@ -402,10 +405,12 @@ services:
 Run with:
 ```bash
 # Container strategy (default)
-docker-compose up
+docker-compose up -d
+docker-compose exec langgraph-sandbox langgraph-sandbox
 
 # Host strategy (with override)
-docker-compose -f docker-compose.yml -f docker-compose.override.yml up
+docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
+docker-compose exec langgraph-sandbox langgraph-sandbox
 ```
 
 ## Usage Examples
