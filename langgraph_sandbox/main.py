@@ -222,7 +222,7 @@ def main():
                     {"messages": [{"role": "user", "content": usr_msg}]},
                     {"configurable": {"thread_id": convo_id}, "recursion_limit": 25},
                 ):
-                    print(f"AI: {chunk['chat_model']['messages'][-1].content}")
+                    print(f"{chunk['chat_model']['messages'][-1].content}")
                     
                     # Collect artifacts from tool messages
                     for message in chunk.get('chat_model', {}).get('messages', []):
