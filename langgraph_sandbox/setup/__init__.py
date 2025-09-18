@@ -74,6 +74,11 @@ def setup_sandbox():
             print(f"✗ Warning: {dirname}/ directory not found in package")
     
     print("\nSetup complete! You can now run:")
+    print("  # Copy and customize config:")
+    print("  cp sandbox.env.example sandbox.env")
+    print("  # Then choose your deployment:")
+    print("  docker-compose up                    # Multi-container (recommended)")
+    print("  # OR")
     print("  docker build -t sandbox:latest -f Dockerfile.sandbox .")
     print("  docker run -p 8000:8000 sandbox:latest")
 
