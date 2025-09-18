@@ -173,7 +173,7 @@ sandbox-setup
 ```
 
 This command will:
-- Copy Docker files (`Dockerfile.sandbox`, `sandbox.env.example`, `docker.env`) to your current directory
+- Copy Docker files (`Dockerfile.sandbox`, `docker-compose.yml`, `docker-compose.override.yml`, `sandbox.env.example`) to your current directory
 - Copy the `sandbox/` directory needed for Docker build
 - Provide instructions for building the Docker image
 
@@ -250,11 +250,13 @@ dataset_tool = make_select_dataset_tool(
 
 ```
 your-project/
-├── sandbox.env            # Your configuration (copy from sandbox.env.example)
-├── Dockerfile.sandbox     # Copied from package
-├── sandbox.env.example    # Template (copied from package)
-├── docker.env             # Alternative config (copied from package)
-├── your_code.py           # Your Python code
+├── sandbox.env                    # Your configuration (copy from sandbox.env.example)
+├── Dockerfile.sandbox             # Copied from package
+├── docker-compose.yml             # Copied from package
+├── docker-compose.override.yml    # Copied from package
+├── sandbox.env.example            # Template (copied from package)
+├── sandbox/                       # Sandbox runtime files
+├── your_code.py                   # Your Python code
 └── ...
 ```
 
@@ -316,41 +318,33 @@ langgraph-sandbox
 
 In `sandbox.env`, set `SESSION_STORAGE=BIND`, `DATASET_ACCESS=LOCAL_RO` and `DATASETS_HOST_RO=./`, then:
 ```bash
-data python main.py
+langgraph-sandbox
 ```
 
-**Production (default):**
+**Production (default -> TMPFS+API):**
 ```bash
 langgraph-sandbox
 ```
 
 **Docker Compose:**
-```env
-SANDBOX_ADDRESS_STRATEGY=container
-COMPOSE_NETWORK=myapp_network
-```
 ```bash
+# Uses container strategy by default
 docker-compose up
+
+# Or customize in docker-compose.yml:
+# SANDBOX_ADDRESS_STRATEGY=container
+# COMPOSE_NETWORK=langgraph-network
 ```
 
 ### Artifact Display Options
 
 The `IN_CHAT_URL` setting controls how generated artifacts (plots, files, etc.) are displayed:
 
-- **`IN_CHAT_URL=false` (default)**: Artifacts are logged to `./artifact_logs/{conversation_id}_artifacts.txt` with download URLs. Clean chat interface without artifact clutter.
+- **`IN_CHAT_URL=false` (default)**: Artifacts are not displayed in chat, but are still returned as artifacts in tools and can be displayed in main app; see [main.py](langgraph_sandbox/main.py) for an example. 
 
 - **`IN_CHAT_URL=true`**: Artifacts are displayed directly in the chat with download links. Useful for interactive sessions where you want immediate access to generated files.
 
 > **Note:** careful adding artifacts URLs to chat, because they might confuse your agent. For bigger, smarter models it's fine, but smaller models may run off track seeing urls. 
-
-Example artifact log entry:
-```
-=== 2024-01-15T10:30:45.123456 ===
-User: Create a plot of random data
-Generated Artifacts:
-  • plot.png (image/png, 15432 bytes)
-    Download: http://localhost:8000/artifacts/download/abc123?token=xyz789
-```
 
 ### Network Configuration
 
@@ -373,6 +367,46 @@ HOST_GATEWAY=host.docker.internal
 - Uses host port mapping and gateway
 - Compatible with traditional deployment
 - URL: `http://host.docker.internal:{mapped_port}`
+
+### Docker Compose Example
+
+The project includes a `docker-compose.yml` file demonstrating both strategies:
+
+**Container Strategy (default):**
+```yaml
+services:
+  app:
+    environment:
+      SANDBOX_ADDRESS_STRATEGY: container
+      COMPOSE_NETWORK: langgraph-network
+    networks:
+      - langgraph-network
+
+networks:
+  langgraph-network:
+    driver: bridge
+```
+
+**Host Strategy (override):**
+```yaml
+# docker-compose.override.yml
+services:
+  app:
+    environment:
+      SANDBOX_ADDRESS_STRATEGY: host
+      HOST_GATEWAY: host.docker.internal
+    ports:
+      - "9000:9000"  # Sandbox REPL
+```
+
+Run with:
+```bash
+# Container strategy (default)
+docker-compose up
+
+# Host strategy (with override)
+docker-compose -f docker-compose.yml -f docker-compose.override.yml up
+```
 
 ## Usage Examples
 

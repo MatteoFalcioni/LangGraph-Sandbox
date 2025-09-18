@@ -16,12 +16,19 @@ def setup_sandbox():
     package_dir = Path(__file__).parent
     # The sandbox directory is in the parent langgraph_sandbox directory
     langgraph_sandbox_dir = package_dir.parent
+    # The project root (where Dockerfile.sandbox template is)
+    project_root = langgraph_sandbox_dir.parent
     current_dir = Path.cwd()
     
-    # Files to copy
-    files_to_copy = [
+    # Files to copy from project root
+    root_files_to_copy = [
         "Dockerfile.sandbox",
-        "docker.env", 
+        "docker-compose.yml",
+        "docker-compose.override.yml"
+    ]
+    
+    # Files to copy from setup directory
+    setup_files_to_copy = [
         "sandbox.env.example"
     ]
     
@@ -32,7 +39,19 @@ def setup_sandbox():
     
     print("Setting up LangGraph Sandbox...")
     
-    for filename in files_to_copy:
+    # Copy files from project root
+    for filename in root_files_to_copy:
+        source = project_root / filename
+        destination = current_dir / filename
+        
+        if source.exists():
+            shutil.copy2(source, destination)
+            print(f"✓ Copied {filename}")
+        else:
+            print(f"✗ Warning: {filename} not found in project root")
+    
+    # Copy files from setup directory
+    for filename in setup_files_to_copy:
         source = package_dir / filename
         destination = current_dir / filename
         
