@@ -369,8 +369,8 @@ langgraph-sandbox
 # Start container
 docker-compose up -d
 
-# Run langgraph-sandbox inside container
-docker-compose exec langgraph-sandbox langgraph-sandbox
+# Run langgraph-sandbox on HOST machine (connects to container)
+langgraph-sandbox
 
 # Or customize in docker-compose.yml:
 # SANDBOX_ADDRESS_STRATEGY=container
@@ -444,11 +444,11 @@ Run with:
 ```bash
 # Container strategy (default)
 docker-compose up -d
-docker-compose exec langgraph-sandbox langgraph-sandbox
+langgraph-sandbox  # Run on HOST machine
 
 # Host strategy (with override)
 docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
-docker-compose exec langgraph-sandbox langgraph-sandbox
+langgraph-sandbox  # Run on HOST machine
 ```
 
 ## Usage Examples
