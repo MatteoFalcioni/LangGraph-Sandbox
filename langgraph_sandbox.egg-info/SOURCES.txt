@@ -2,6 +2,7 @@ MANIFEST.in
 README.md
 pyproject.toml
 requirements.txt
+sandbox.env.example
 setup.py
 langgraph_sandbox/__init__.py
 langgraph_sandbox/config.py
@@ -44,7 +45,6 @@ langgraph_sandbox/sandbox/__pycache__/session_manager.cpython-311.pyc
 langgraph_sandbox/setup/Dockerfile.sandbox
 langgraph_sandbox/setup/__init__.py
 langgraph_sandbox/setup/__main__.py
-langgraph_sandbox/setup/env_example_new
 langgraph_sandbox/setup/sandbox.env.example
 langgraph_sandbox/setup/__pycache__/__init__.cpython-310.pyc
 langgraph_sandbox/setup/__pycache__/__init__.cpython-311.pyc
