@@ -53,8 +53,8 @@ def main():
     # Load environment configuration
     env_file = Path("sandbox.env")
     if not env_file.exists():
-        env_file = Path("example.env")
-        print("(❗) No sandbox.env file found, using example.env - you should rename it to sandbox.env and fill in the OpenAI API key")
+        env_file = Path("sandbox.env.example")
+        print("(❗) No sandbox.env file found, using sandbox.env.example - you should copy it to sandbox.env and fill in the OpenAI API key")
     
     env_loaded = load_dotenv(env_file)
     if env_loaded:
@@ -87,6 +87,9 @@ def main():
         datasets_path=cfg.datasets_host_ro,
         session_root=cfg.sessions_root,
         tmpfs_size=cfg.tmpfs_size_mb,
+        address_strategy=cfg.sandbox_address_strategy,
+        compose_network=cfg.compose_network,
+        host_gateway=cfg.host_gateway,
     )
     
     # Create tools with session key function
@@ -107,17 +110,47 @@ def main():
     app = FastAPI()
     app.include_router(artifacts_router)
     
-    # Start artifact server
+    # Start artifact server with port fallback
+    server_port = [None]  # Use a list to make it mutable
+    
     def run_server():
-        try:
-            uvicorn.run(app, host="0.0.0.0", port=8000, log_level="error")
-        except Exception as e:
-            print(f"Server error: {e}")
+        ports_to_try = [8000, 8001, 8002, 8003, 8004]
+        for port in ports_to_try:
+            try:
+                server_port[0] = port
+                # Set the server port in environment for URL generation
+                os.environ["ARTIFACTS_SERVER_PORT"] = str(port)
+                # Suppress uvicorn's error output by redirecting stderr temporarily
+                import sys
+                from contextlib import redirect_stderr
+                from io import StringIO
+                
+                # Capture uvicorn's stderr to suppress the port error message
+                stderr_capture = StringIO()
+                with redirect_stderr(stderr_capture):
+                    uvicorn.run(app, host="0.0.0.0", port=port, log_level="error")
+                break  # Success, exit the loop
+            except OSError as e:
+                if "address already in use" in str(e).lower():
+                    if port == ports_to_try[0]:  # Only show warning for first attempt
+                        print(f"⚠️  Port {port} is already in use (likely by Docker Compose), trying alternative port...")
+                    continue  # Try next port
+                else:
+                    print(f"Server error: {e}")
+                    break
+            except Exception as e:
+                print(f"Server error: {e}")
+                break
     
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
     time.sleep(2)  # Give server time to start
-    print("✅ Artifact server started on http://localhost:8000")
+    
+    # Report the actual port used
+    if server_port[0]:
+        print(f"✅ Artifact server started on http://localhost:{server_port[0]}")
+    else:
+        print("✅ Artifact server started")
 
     # Create simple graph
     from langgraph.graph import StateGraph, MessagesState, END
@@ -189,20 +222,27 @@ def main():
             
             print("\n🤖 AI: ", end="", flush=True)
             
-            # Run the conversation
+            # Run the conversation with timeout
             import asyncio
+            
             async def run_conversation():
                 artifacts_log = []
-                async for chunk in graph.astream(
-                    {"messages": [{"role": "user", "content": usr_msg}]},
-                    {"configurable": {"thread_id": convo_id}, "recursion_limit": 25},
-                ):
-                    print(f"AI: {chunk['chat_model']['messages'][-1].content}")
-                    
-                    # Collect artifacts from tool messages
-                    for message in chunk.get('chat_model', {}).get('messages', []):
-                        if hasattr(message, 'artifact') and message.artifact:
-                            artifacts_log.extend(message.artifact)
+                try:
+                    # Add timeout to prevent hanging
+                    async with asyncio.timeout(60):  # 60 second timeout
+                        async for chunk in graph.astream(
+                            {"messages": [{"role": "user", "content": usr_msg}]},
+                            {"configurable": {"thread_id": convo_id}, "recursion_limit": 25},
+                        ):
+                            print(f"{chunk['chat_model']['messages'][-1].content}")
+                            
+                            # Collect artifacts from tool messages
+                            for message in chunk.get('chat_model', {}).get('messages', []):
+                                if hasattr(message, 'artifact') and message.artifact:
+                                    artifacts_log.extend(message.artifact)
+                except asyncio.TimeoutError:
+                    print("\n⏰ Request timed out after 60 seconds")
+                    return
                 
                 # Handle artifacts if not displayed in chat
                 if artifacts_log and not cfg.in_chat_url:
@@ -225,7 +265,12 @@ def main():
                     
                     print(f"\n📁 {len(artifacts_log)} artifact(s) logged to: {artifact_log_path}")
             
-            asyncio.run(run_conversation())
+            # Run with proper signal handling
+            try:
+                asyncio.run(run_conversation())
+            except KeyboardInterrupt:
+                print("\n⏹️  Interrupted by user")
+                break
             print()  # New line after response
             
         except KeyboardInterrupt:

@@ -41,6 +41,11 @@ class Config:
     # --- artifact display options ---
     in_chat_url: bool = False  # Include artifact URLs directly in chat content
 
+    # --- network configuration ---
+    sandbox_address_strategy: str = "container"  # "container" or "host"
+    compose_network: Optional[str] = "langgraph-network"
+    host_gateway: str = "host.docker.internal"
+
     # --- in-container canonical paths (do not change lightly) ---
     container_session_path: str = "/session"
     container_data_staged: str  = "/session/data"  # for API
@@ -149,8 +154,9 @@ class Config:
         Load configuration from environment variables, optionally from a file.
         
         Args:
-            env_file_path: Optional path to environment file. If provided, variables
-                         from the file take precedence over system environment variables.
+            env_file_path: Optional path to environment file. If None, looks for 'sandbox.env' 
+                         in current directory. If provided, variables from the file take 
+                         precedence over system environment variables.
         
         Environment variables:
           - SESSION_STORAGE = TMPFS | BIND           (default: TMPFS)
@@ -163,9 +169,24 @@ class Config:
           - SANDBOX_IMAGE   = sandbox:latest
           - TMPFS_SIZE_MB   = 1024
           - IN_CHAT_URL     = true | false           (default: false)
+          - SANDBOX_ADDRESS_STRATEGY = container | host  (default: container)
+          - COMPOSE_NETWORK  = network_name             (optional)
+          - HOST_GATEWAY     = host.docker.internal     (default: host.docker.internal)
         """
         # Load environment variables from file if provided
+        if env_file_path is None:
+            # Look for sandbox.env in current directory
+            sandbox_env = Path("sandbox.env")
+            if sandbox_env.exists():
+                env_file_path = sandbox_env
+        
         env_vars = cls._load_env_file(env_file_path)
+        
+        # Set all loaded environment variables in the system environment
+        # This ensures that libraries like langchain can access them (e.g., OPENAI_API_KEY)
+        for key, value in env_vars.items():
+            if key not in os.environ:  # Don't override existing env vars
+                os.environ[key] = value
         
         session_storage = cls._get_env_enum("SESSION_STORAGE", SessionStorage, SessionStorage.TMPFS, env_vars)
         dataset_access  = cls._get_env_enum("DATASET_ACCESS",  DatasetAccess,  DatasetAccess.API, env_vars)
@@ -180,6 +201,11 @@ class Config:
         sandbox_image   = cls._get_env_value("SANDBOX_IMAGE", "sandbox:latest", env_vars)
         tmpfs_size_mb   = int(cls._get_env_value("TMPFS_SIZE_MB", "1024", env_vars))
         in_chat_url     = cls._get_env_value("IN_CHAT_URL", "false", env_vars).lower() in ("true", "1", "yes")
+        
+        # Network configuration
+        sandbox_address_strategy = cls._get_env_value("SANDBOX_ADDRESS_STRATEGY", "container", env_vars)
+        compose_network = cls._get_env_value("COMPOSE_NETWORK", "langgraph-network", env_vars)
+        host_gateway = cls._get_env_value("HOST_GATEWAY", "host.docker.internal", env_vars)
 
         # Basic validation
         if dataset_access == DatasetAccess.LOCAL_RO:
@@ -200,6 +226,9 @@ class Config:
             sandbox_image=sandbox_image,
             tmpfs_size_mb=tmpfs_size_mb,
             in_chat_url=in_chat_url,
+            sandbox_address_strategy=sandbox_address_strategy,
+            compose_network=compose_network,
+            host_gateway=host_gateway,
         )
 
 if __name__ == "__main__":

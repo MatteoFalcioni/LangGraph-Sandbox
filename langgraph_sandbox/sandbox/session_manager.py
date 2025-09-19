@@ -22,10 +22,12 @@ try:
     # Try relative imports first (when used as a module)
     from ..artifacts.ingest import ingest_files
     from .container_utils import cleanup_sandbox_containers
+    from .io import file_exists_in_container
 except ImportError:
     # Fall back to absolute imports (when run directly)
     from artifacts.ingest import ingest_files
     from sandbox.container_utils import cleanup_sandbox_containers
+    from sandbox.io import file_exists_in_container
 
 from enum import Enum
 
@@ -109,6 +111,9 @@ class SessionManager:
         datasets_path: Optional[Path] = None,
         session_root: Path = Path("sessions"),
         tmpfs_size: str = "1g",
+        address_strategy: str = "container",
+        compose_network: Optional[str] = None,
+        host_gateway: str = "host.docker.internal",
     ):
         """
         Args:
@@ -118,6 +123,9 @@ class SessionManager:
             datasets_path: Required when dataset_access=LOCAL_RO; mounted at /data (RO).
             session_root: Base host dir for per-session folders when using BIND.
             tmpfs_size: Soft cap (e.g., "1g", "512m") for /session when using TMPFS.
+            address_strategy: "container" for Docker network DNS, "host" for port mapping.
+            compose_network: Docker network name for container strategy.
+            host_gateway: Gateway hostname for host strategy (default: host.docker.internal).
         """
         self.client = docker.from_env()
         self.image = image
@@ -135,9 +143,73 @@ class SessionManager:
 
         self.session_root = Path(session_root).resolve()
         self.tmpfs_size = tmpfs_size
+        
+        # Network configuration
+        self.address_strategy = address_strategy
+        self.compose_network = compose_network
+        self.host_gateway = host_gateway
 
         # In-memory registry: session_key -> SessionInfo
         self.sessions: Dict[str, SessionInfo] = {}
+
+    def _get_repl_url(self, session_key: str) -> str:
+        """
+        Get the REPL URL for a session based on address strategy.
+        
+        Args:
+            session_key: Session identifier
+            
+        Returns:
+            Base URL for the REPL (e.g., "http://container-name:9000" or "http://host.docker.internal:12345")
+        """
+        info = self.sessions.get(session_key)
+        if not info:
+            raise RuntimeError("Unknown session_key. Call start() first.")
+        
+        if self.address_strategy == "container":
+            # Use container name for DNS resolution
+            container_name = f"sbox-{session_key}"
+            return f"http://{container_name}:9000"
+        else:
+            # Use host gateway with mapped port
+            # Auto-detect the right host gateway for the environment
+            host_gateway = self._detect_host_gateway()
+            return f"http://{host_gateway}:{info.host_port}"
+
+    def _detect_host_gateway(self) -> str:
+        """
+        Detect the appropriate host gateway based on the environment.
+        
+        Returns:
+            The host gateway to use for connecting to containers.
+        """
+        # If explicitly configured, use that
+        if self.host_gateway != "host.docker.internal":
+            return self.host_gateway
+        
+        # Auto-detect environment
+        import platform
+        import os
+        
+        # Check if we're in WSL2
+        if "microsoft" in platform.uname().release.lower():
+            return "localhost"
+        
+        # Check if we're in a container (Docker-in-Docker)
+        if os.path.exists("/.dockerenv"):
+            return "host.docker.internal"
+        
+        # Check if host.docker.internal is reachable
+        try:
+            import socket
+            socket.gethostbyname("host.docker.internal")
+            return "host.docker.internal"
+        except socket.gaierror:
+            # Fallback to localhost
+            return "localhost"
+        
+        # Default fallback
+        return "localhost"
 
     def _write_session_log(self, session_key: str, log_entry: dict) -> None:
         """
@@ -276,8 +348,9 @@ with open('/session/python_state.json', 'w') as f:
         
         try:
             with httpx.Client(timeout=10) as http:
+                base_url = self._get_repl_url(session_key)
                 r = http.post(
-                    f"http://127.0.0.1:{info.host_port}/exec",
+                    f"{base_url}/exec",
                     json={"code": state_code, "timeout": 10},
                 )
                 if r.status_code == 200:
@@ -348,7 +421,13 @@ with open('/session/python_state.json', 'w') as f:
             if existing.status not in ("running",):
                 existing.start()
             existing.reload()
-            host_port = int(existing.attrs["NetworkSettings"]["Ports"][REPL_PORT][0]["HostPort"])
+            
+            # Get port info based on strategy
+            if self.address_strategy == "container":
+                host_port = 9000  # Container internal port
+            else:
+                host_port = int(existing.attrs["NetworkSettings"]["Ports"][REPL_PORT][0]["HostPort"])
+                
             # Ensure session_dir is set correctly based on current storage mode
             if self.session_storage == SessionStorage.BIND:
                 sess_dir = (self.session_root / sid).resolve()
@@ -357,6 +436,14 @@ with open('/session/python_state.json', 'w') as f:
             return sid
         except docker.errors.NotFound:
             pass  # create a new container
+        except Exception as e:
+            # If there's any other issue with the existing container, remove it and create a new one
+            try:
+                existing = self.client.containers.get(name)
+                existing.stop()
+                existing.remove()
+            except:
+                pass  # Ignore errors when removing problematic container
 
         # Build mounts
         volumes: Dict[str, Dict[str, str]] = {}
@@ -378,32 +465,64 @@ with open('/session/python_state.json', 'w') as f:
             volumes[str(self.datasets_path)] = {"bind": "/data", "mode": "ro"}
         # NONE and API modes don't mount /data
 
-        # Run container (random host port for REPL)
+        # Configure networking based on strategy
+        if self.address_strategy == "container":
+            # Container strategy: no port mapping, use Docker network
+            ports = {}  # No port mapping
+            network = self.compose_network
+        else:
+            # Host strategy: port mapping for external access
+            ports = {"9000/tcp": None}  # random host port for REPL
+            network = None
+
+        # Ensure no container with this name exists before creating
+        try:
+            existing_container = self.client.containers.get(name)
+            # If we get here, a container with this name exists
+            existing_container.stop()
+            existing_container.remove()
+        except docker.errors.NotFound:
+            # No existing container, which is what we want
+            pass
+        except Exception as e:
+            # If there's any issue removing the existing container, log it but continue
+            print(f"Warning: Could not remove existing container {name}: {e}")
+
+        
+        # Run container
         container = self.client.containers.run(
             self.image,
             detach=True,
             mem_limit="8g",                 # tune for your infra/tenancy
             nano_cpus=2_000_000_000,       # ~2 vCPU
-            ports={"9000/tcp": None},      # random host port for REPL
+            ports=ports,
             volumes=volumes,
             tmpfs=tmpfs or None,
             name=name,
+            network=network,
         )
         container.reload()
-        host_port = int(container.attrs["NetworkSettings"]["Ports"][REPL_PORT][0]["HostPort"])
+        
+        # Get port info based on strategy
+        if self.address_strategy == "container":
+            host_port = 9000  # Container internal port
+        else:
+            host_port = int(container.attrs["NetworkSettings"]["Ports"][REPL_PORT][0]["HostPort"])
 
         # Wait for /health quickly (best-effort)
+        # Register session first so we can use _get_repl_url
+        self.sessions[sid] = SessionInfo(container.id, host_port, sess_dir, self.session_storage)
+        
         with httpx.Client(timeout=5.0) as http:
             for _ in range(50):  # ~5s worst case
                 try:
-                    r = http.get(f"http://127.0.0.1:{host_port}/health")
+                    base_url = self._get_repl_url(sid)
+                    r = http.get(f"{base_url}/health")
                     if r.status_code == 200:
                         break
                 except Exception:
                     pass
                 time.sleep(0.1)
-
-        self.sessions[sid] = SessionInfo(container.id, host_port, sess_dir, self.session_storage)
         
         # Write initial session metadata (BIND mode only)
         if self.session_storage == SessionStorage.BIND:
@@ -543,9 +662,13 @@ with open('/session/python_state.json', 'w') as f:
                     fdst.write(fsrc.read())
             return out_path
 
+        # Check if file exists first using exec_run instead of get_archive
+        if not file_exists_in_container(container, container_path):
+            raise RuntimeError(f"File {container_path} does not exist in container")
+
         # a few quick retries to smooth out FS propagation on tmpfs
         for attempt in range(5):
-            # 1) direct get_archive(file)
+            # 1) direct get_archive(file) - only if file exists
             try:
                 bits, _ = container.get_archive(container_path)
                 data = b"".join(bits)
@@ -556,18 +679,7 @@ with open('/session/python_state.json', 'w') as f:
                 if attempt == 4:
                     raise
 
-            # 2) get_archive(parent) and extract filename
-            try:
-                bits, _ = container.get_archive(parent)
-                data = b"".join(bits)
-                return _extract_one(data, filename, dst_dir / filename)
-            except docker.errors.NotFound:
-                pass
-            except Exception:
-                if attempt == 4:
-                    raise
-
-            # 3) exec tar in the container and read from stdout
+            # 2) exec tar in the container and read from stdout (safer than get_archive on parent)
             try:
                 rc, out = container.exec_run(
                     ["bash", "-lc", f"set -euo pipefail; cd {parent} && tar -cf - {filename}"],
@@ -642,8 +754,9 @@ if session_artifacts.exists():
         # Execute cleanup code in the container
         try:
             with httpx.Client(timeout=10) as http:
+                base_url = self._get_repl_url(session_key)
                 r = http.post(
-                    f"http://127.0.0.1:{info.host_port}/exec",
+                    f"{base_url}/exec",
                     json={"code": cleanup_code, "timeout": 10},
                 )
                 r.raise_for_status()
@@ -695,8 +808,9 @@ if session_artifacts.exists():
 
         # Execute via REPL
         with httpx.Client(timeout=timeout + 5) as http:
+            base_url = self._get_repl_url(session_key)
             r = http.post(
-                f"http://127.0.0.1:{info.host_port}/exec",
+                f"{base_url}/exec",
                 json={"code": code, "timeout": timeout},
             )
             r.raise_for_status()

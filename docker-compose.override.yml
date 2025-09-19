@@ -1,0 +1,14 @@
+# Override for development/testing with host networking
+# This file is automatically loaded by docker-compose
+
+services:
+  langgraph-sandbox:
+    environment:
+      # Override to use host networking for development
+      SANDBOX_ADDRESS_STRATEGY: host
+      HOST_GATEWAY: host.docker.internal
+      # Remove COMPOSE_NETWORK when using host strategy
+    # Add port mapping for sandbox when using host strategy
+    ports:
+      - "8000:8000"  # Artifacts API
+      - "9000:9000"  # Sandbox REPL (for host strategy)

@@ -8,16 +8,12 @@ A production-ready Docker sandbox for executing Python code within LangGraph age
 - [Key Features](#key-features)
 - [Execution Modes](#execution-modes)
 - [Quick Start](#quick-start)
-- [Using as a Package in Other Projects](#using-as-a-package-in-other-projects)
 - [Configuration](#configuration)
-- [Usage Examples](#usage-examples)
 - [Tool Factory](#tool-factory)
 - [Artifact System](#artifact-system)
 - [Session Management](#session-management)
 - [Development & Debugging](#development--debugging)
-- [Installation](#installation)
 - [API Reference](#api-reference)
-- [Security](#security)
 - [Troubleshooting](#troubleshooting)
 
 ## Overview
@@ -29,6 +25,7 @@ This sandbox replaces services like E2B by running isolated Docker containers fo
 - **Flexible dataset access**: No datasets, local read-only mounts, or API-based staging
 - **Automatic artifact management**: Files are deduplicated, stored securely, and accessible via signed URLs
 - **Enhanced debugging**: Complete execution logs and state inspection in BIND mode
+- **Docker Compose setup out-of-the-box**: Possibility to choose network-oriented compose or simple docker image runs
 
 ## Key Features
 
@@ -60,9 +57,36 @@ The system offers six execution modes based on two independent configuration kno
 
 ## Quick Start
 
-### Option 1: Python Package Installation (Recommended)
+### Option 1: Manual Installation
 
-#### For Development/Testing:
+```bash
+# Clone the repository and build the Docker Image
+git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
+cd LangGraph-Sandbox
+
+# Install Dependencies
+pip install -r requirements.txt
+
+# Set up the sandbox environment (copies required files)
+python sandbox-setup
+
+# Set up configuration
+cp sandbox.env.example sandbox.env
+# Edit sandbox.env and add your OPENAI_API_KEY
+
+# Build the Docker image
+docker build -t sandbox:latest -f Dockerfile.sandbox .
+```
+
+Run a simple example:
+
+```bash
+# Run Simple Example
+langgraph-sandbox
+```
+
+### Option 2: Python Package Installation 
+
 ```bash
 # Clone and install the package
 git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
@@ -74,11 +98,32 @@ python --version  # Should show Python 3.11.x or higher
 # Install the package in development mode
 pip install -e .
 
-# Build the Docker image
-docker build -t sandbox:latest -f Dockerfile .
+# Set up the sandbox environment (copies required files)
+sandbox-setup
+```
+you should see: 
+```bash
+Setting up LangGraph Sandbox...
+✓ Copied Dockerfile.sandbox
+✓ Copied docker-compose.yml
+✓ Copied docker-compose.override.yml
+✓ Copied sandbox.env.example
+✓ Copied sandbox/ directory
+#...
 ```
 
-Set your OpenAI API key by modifying the `example.env` file, rename it to `sandbox.env` and run the example:
+then:
+
+```bash
+# Set up configuration
+cp sandbox.env.example sandbox.env
+# Edit sandbox.env and add your OPENAI_API_KEY
+
+# Build the Docker image
+docker build -t sandbox:latest -f Dockerfile.sandbox .
+```
+
+Run the example:
 
 ```bash
 # Run the simple sandbox
@@ -86,186 +131,28 @@ langgraph-sandbox
 ```
 
 #### For Using in Other Projects:
+
+Once you have cloned the repo to your `<path_to_LangGraph-Sandbox>`:
 ```bash
 # Install the package (development mode)
-pip install -e /path/to/LangGraph-Sandbox
-
-# Or install from built package
-pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
-
-# Run setup to copy Docker files and build image
-sandbox-setup
+pip install -e <path_to_LangGraph-Sandbox>
 ```
 
-Then customize your `sandbox.env` file and use in your code:
-
-```python
-from langgraph_sandbox import make_code_sandbox_tool, SessionManager, Config
-
-# Load configuration
-config = Config.from_env()
-session_manager = SessionManager(
-    image=config.sandbox_image,
-    session_storage=config.session_storage,
-    dataset_access=config.dataset_access,
-    datasets_path=config.datasets_host_ro,
-    session_root=config.sessions_root,
-    tmpfs_size=config.tmpfs_size_mb,
-)
-
-# Create tools with a session key function
-def get_session_key():
-    return "my_unique_session_id"  # Use your own session management key if needed for UI (otherwise defaults to convo)
-
-code_tool = make_code_sandbox_tool(
-    session_manager=session_manager,
-    session_key_fn=get_session_key
-)
-```
-
-### Option 2: Manual Installation
-
-```bash
-# Clone the repository and build the Docker Image
-git clone https://github.com/MatteoFalcioni/LangGraph-Sandbox
-cd LangGraph-Sandbox
-docker build -t sandbox:latest -f Dockerfile .
-
-# Install Dependencies
-pip install -r requirements.txt
-```
-
-Then set your OpenAI API key by modifying the `example.env` file, rename it to `simple_sandbox.env` and run a simple example:
-
-```bash
-# Run Simple Example
-langgraph-sandbox
-```
-
-## Using as a Package in Other Projects
-
-### Installation
-
-**Requirements:**
-- Python >= 3.11
-- Docker installed and running
-
-```bash
-# Install in development mode (recommended for local development)
-pip install -e /path/to/LangGraph-Sandbox
-
-# Or install from built package
-pip install dist/langgraph_sandbox-0.1.0-py3-none-any.whl
-```
-
-**Note:** After installation, the package modules are available as top-level imports:
-- `from langgraph_sandbox import make_code_sandbox_tool, SessionManager, Config`
-- `import langgraph_sandbox.tool_factory`, `import langgraph_sandbox.sandbox`, `import langgraph_sandbox.artifacts`, `import langgraph_sandbox.dataset_manager`
-
-**Usage Examples:** The package includes complete usage examples that are installed with the package. You can find them in your Python environment or use them as templates for your own projects.
-
-### Setup Docker Environment
-
-After installation, run the setup command to copy Docker files to your project directory:
-
-```bash
-sandbox-setup
-```
-
-This command will:
-- Copy Docker files (`Dockerfile`, `example.env`, `docker.env`) to your current directory
-- Copy the `sandbox/` directory needed for Docker build
-- Provide instructions for building the Docker image
-
-Then build the Docker image:
-```bash
-docker build -t sandbox:latest -f Dockerfile .
-```
-
-### Customize Configuration
-
-Edit the `example.env` file to customize your setup.
-
-Key settings you might want to change:
-- `SESSION_STORAGE`: `TMPFS` (default) or `BIND`
-- `DATASET_ACCESS`: `API`, `LOCAL_RO`, or `API_TMPFS`
-- `SESSIONS_ROOT`: Directory for session storage
-- `SANDBOX_IMAGE`: Docker image name (default: `sandbox:latest`)
-- `TMPFS_SIZE_MB`: Size of tmpfs mount (default: 1024)
-
-Then rename it to `sandbox.env`.
-
-### Usage in Your Code
-
-```python
-from langgraph_sandbox import (
-    make_code_sandbox_tool,
-    make_select_dataset_tool,
-    make_export_datasets_tool,
-    make_list_datasets_tool,
-    SessionManager,
-    Config
-)
-
-# Load configuration
-config = Config.from_env()
-
-# Create session manager
-session_manager = SessionManager(
-    image=config.sandbox_image,
-    session_storage=config.session_storage,
-    dataset_access=config.dataset_access,
-    datasets_path=config.datasets_host_ro,
-    session_root=config.sessions_root,
-    tmpfs_size=config.tmpfs_size_mb,
-)
-
-# Create tools with a session key function
-def get_session_key():
-    return "my_unique_session_id"  # Use your own session management
-
-code_tool = make_code_sandbox_tool(
-    session_manager=session_manager,
-    session_key_fn=get_session_key,
-    timeout_s=60
-)
-
-# Custom dataset fetching function
-def my_fetch_function(dataset_id: str) -> bytes:
-    # Your custom logic to fetch dataset
-    return dataset_bytes
-
-dataset_tool = make_select_dataset_tool(
-    session_manager=session_manager,
-    fetch_fn=my_fetch_function
-)
-
-# Use in your LangGraph workflow
-# ... your code here
-```
+then follow the same steps of [option 2 above](#option-2-python-package-installation)
 
 ### Project Structure After Setup
 
 ```
 your-project/
-├── .env                    # Your configuration
-├── Dockerfile             # Copied from package
-├── example.env            # Template (copied from package) -> **rename to sandbox.env**
-├── docker.env             # Alternative config (copied from package)
-├── your_code.py           # Your Python code
+├── sandbox.env                    # Your configuration (copy from sandbox.env.example)
+├── Dockerfile.sandbox             # Copied from package
+├── docker-compose.yml             # Copied from package
+├── docker-compose.override.yml    # Copied from package
+├── sandbox.env.example            # Template (copied from package)
+├── sandbox/                       # Sandbox runtime files
+├── your_code.py                   # Your Python code
 └── ...
 ```
-
-### Custom Docker Image
-
-To use a custom Docker image:
-
-1. Modify the Dockerfile in your project directory
-2. Update the `SANDBOX_IMAGE` in your `sandbox.env` file
-3. Rebuild the image:
-   ```bash
-   docker build -t your-custom-image:latest .
-   ```
 
 ## Configuration
 
@@ -273,27 +160,40 @@ Configuration is managed through environment variables with sensible defaults:
 
 ### Core Settings
 
-```env
-# Session storage: TMPFS (RAM) or BIND (disk)
-SESSION_STORAGE=TMPFS
+```sandbox.env
 
-# Dataset access: NONE, LOCAL_RO, or API
-DATASET_ACCESS=API
+# --- Core knobs ---
+SESSION_STORAGE=TMPFS        # TMPFS | BIND
+DATASET_ACCESS=API           # API | LOCAL_RO | NONE
 
-# Paths (optional - defaults provided)
+# --- Host paths ---
 SESSIONS_ROOT=./sessions
 BLOBSTORE_DIR=./blobstore
 ARTIFACTS_DB=./artifacts.db
 
-# Required only for LOCAL_RO mode
-DATASETS_HOST_RO=./example_llm_data
+# Required ONLY if DATASET_ACCESS=LOCAL_RO
+# DATASETS_HOST_RO=./example_llm_data
 
-# Docker settings
+# --- Docker / runtime ---
 SANDBOX_IMAGE=sandbox:latest
 TMPFS_SIZE_MB=1024
 
-# Artifact display options
-IN_CHAT_URL=false  # Show artifact URLs in chat (true) or log to file (false)
+# --- Artifact display options ---
+IN_CHAT_URL=false            # true | false (default: false)
+
+# --- Network configuration ---
+# "host" strategy: Uses port mapping, works everywhere (recommended)
+# "container" strategy: Uses Docker network DNS, requires Docker Compose
+SANDBOX_ADDRESS_STRATEGY=host  # "container" for Docker network DNS, "host" for port mapping
+COMPOSE_NETWORK=langgraph-network  # Docker network name (optional, only used with container strategy)
+HOST_GATEWAY=host.docker.internal  # Gateway hostname for host strategy (auto-detected in WSL2)
+
+# --- External API keys ---
+# OPENAI_API_KEY=your_openai_api_key_here
+
+# --- Artifacts service (optional) ---
+# ARTIFACTS_PUBLIC_BASE_URL=http://localhost:8000  # default: http://localhost:8000
+# ARTIFACTS_TOKEN_TTL_SECONDS=600                  # default: 600 seconds
 ```
 
 ### Quick Configuration Examples
@@ -309,69 +209,140 @@ langgraph-sandbox
 
 In `sandbox.env`, set `SESSION_STORAGE=BIND`, `DATASET_ACCESS=LOCAL_RO` and `DATASETS_HOST_RO=./`, then:
 ```bash
-data python main.py
+langgraph-sandbox
 ```
 
-**Production (default):**
+**Production (default -> TMPFS+API):**
 ```bash
 langgraph-sandbox
+```
+
+**Docker Compose:**
+```bash
+# Start container
+docker-compose up -d
+
+# Run langgraph-sandbox on HOST machine (connects to container)
+langgraph-sandbox
+
+# Or customize in docker-compose.yml:
+# SANDBOX_ADDRESS_STRATEGY=container
+# COMPOSE_NETWORK=langgraph-network
 ```
 
 ### Artifact Display Options
 
 The `IN_CHAT_URL` setting controls how generated artifacts (plots, files, etc.) are displayed:
 
-- **`IN_CHAT_URL=false` (default)**: Artifacts are logged to `./artifact_logs/{conversation_id}_artifacts.txt` with download URLs. Clean chat interface without artifact clutter.
+- **`IN_CHAT_URL=false` (default)**: Artifacts are not displayed in chat, but are still returned as artifacts in tools and can be displayed in main app; see [main.py](langgraph_sandbox/main.py) for an example. 
 
 - **`IN_CHAT_URL=true`**: Artifacts are displayed directly in the chat with download links. Useful for interactive sessions where you want immediate access to generated files.
 
-> **Note:** careful adding artifacts URLs to chat, because they might confuse your agent. For bigger, smarter models it's fine, but smaller models may run off track seeing urls. 
+> **Note:** careful if adding artifacts URLs to chat, because they might confuse your agent. For bigger, smarter models it's fine, but smaller models may run off track seeing urls. 
 
-Example artifact log entry:
+### Network Configuration
+
+**Host Strategy** (default, recommended):
+```env
+SANDBOX_ADDRESS_STRATEGY=host
+HOST_GATEWAY=host.docker.internal
 ```
-=== 2024-01-15T10:30:45.123456 ===
-User: Create a plot of random data
-Generated Artifacts:
-  • plot.png (image/png, 15432 bytes)
-    Download: http://localhost:8000/artifacts/download/abc123?token=xyz789
+- Uses host port mapping and gateway
+- Compatible with traditional Docker deployment
+- URL: `http://host.docker.internal:{mapped_port}` (or `http://localhost:{mapped_port}` in WSL2)
+- **Auto-detects environment**: Automatically uses `localhost` in WSL2, `host.docker.internal` in Docker Desktop
+- **This is the default configuration** - works out of the box everywhere
+
+**Container Strategy** (for Docker Compose deployments):
+```env
+SANDBOX_ADDRESS_STRATEGY=container
+COMPOSE_NETWORK=langgraph-network
 ```
+- Containers communicate via Docker network DNS
+- No port mapping needed
+- URL: `http://sbox-{session_id}:9000`
+- Requires Docker Compose setup (see Docker Compose Setup below)
 
-## Usage Examples
+### Docker Compose Setup
 
-The repository includes three complete examples demonstrating different modes. **Run all examples from the project root directory:**
+The project includes a `docker-compose.yml` file with **pre-configured networking** for the container strategy:
 
-### Simple Sandbox (TMPFS_NONE)
+#### ✅ Container Strategy Networking (Already Configured):
+
+The `docker-compose.yml` file already includes:
+- Custom Docker network: `langgraph-network`
+- Proper network configuration for container strategy
+- Default environment variables set correctly
+
+**Note:** The default `sandbox.env.example` uses Host Strategy. To use Container Strategy with Docker Compose, change `SANDBOX_ADDRESS_STRATEGY=container` in your `sandbox.env` file.
+
+#### Manual Network Creation (if needed):
+
+If you encounter network issues, you can manually create the network:
 ```bash
-# From project root - recommended approach
-langgraph-sandbox
-
-# Alternative: run directly from example directory
-cd usage_examples/simple_sandbox
-python main.py
+docker network create langgraph-network
 ```
-- No datasets, pure code execution
-- Perfect for algorithms and calculations
-- Everything runs in memory
 
-### Fully Local (BIND_LOCAL)
+#### Troubleshooting Container Strategy:
+
+If you encounter issues with container strategy:
+
+1. **Check if network exists:**
+   ```bash
+   docker network ls | grep langgraph-network
+   ```
+
+2. **Verify container is in correct network:**
+   ```bash
+   docker inspect sbox-{session_id} | grep -A 10 "Networks"
+   ```
+
+3. **Test connectivity from main app:**
+   ```bash
+   docker exec -it {main_app_container} curl http://sbox-{session_id}:9000/health
+   ```
+
+### Docker Compose Example
+
+The project includes a `docker-compose.yml` file demonstrating both strategies:
+
+**Container Strategy (default):**
+```yaml
+services:
+  app:
+    environment:
+      SANDBOX_ADDRESS_STRATEGY: container
+      COMPOSE_NETWORK: langgraph-network
+    networks:
+      - langgraph-network
+
+networks:
+  langgraph-network:
+    driver: bridge
+```
+
+**Host Strategy (override):**
+```yaml
+# docker-compose.override.yml
+services:
+  app:
+    environment:
+      SANDBOX_ADDRESS_STRATEGY: host
+      HOST_GATEWAY: host.docker.internal
+    ports:
+      - "9000:9000"  # Sandbox REPL
+```
+
+Run with:
 ```bash
-# From project root
-cd usage_examples/fully_local
-python main.py
-```
-- Persistent session storage
-- Local datasets mounted read-only
-- Full debugging capabilities
+# Container strategy (default)
+docker-compose up -d
+langgraph-sandbox  # Run on HOST machine
 
-### TMPFS API (TMPFS_API)
-```bash
-# From project root
-cd usage_examples/tmpfs_api
-python main.py
+# Host strategy (with override)
+docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
+langgraph-sandbox  # Run on HOST machine
 ```
-- Dynamic dataset fetching via API
-- Memory-based caching
-- Multi-tenant ready
 
 ## Tool Factory 
 
@@ -411,7 +382,7 @@ Instead of writing custom tool implementations, you get:
 ```python
 # Example: Create tools in 4 lines
 def get_session_key():
-    return "my_session_id"  # Implement your session management logic
+    return "my_session_id"  # Implement your session management logic if needed
 
 code_tool = make_code_sandbox_tool(session_manager=sm, session_key_fn=get_session_key)
 dataset_tool = make_select_dataset_tool(session_manager=sm, fetch_fn=my_fetch, client=my_client)
@@ -419,11 +390,11 @@ export_tool = make_export_datasets_tool(session_manager=sm, session_key_fn=get_s
 list_tool = make_list_datasets_tool(session_manager=sm, session_key_fn=get_session_key)
 ```
 
-> **Session Key Management:** The `session_key_fn` parameter is crucial for maintaining session isolation. Each unique session key gets its own container, so implement proper session management in your application (e.g., user ID, conversation ID, or thread ID). You can see in our example that we did it in main by generating a random session key.
+> **Session Key Management:** The `session_key_fn` parameter is crucial for maintaining session isolation. Each unique session key gets its own container, so implement proper session management in your application (e.g., user ID, conversation ID, or thread ID). You can see in our [main.py](langgraph_sandbox/main.py) example that we did it by generating a random session key.
 
 > **Note:** Notice that the `make_select_dataset_tool` expects the `fetch_fn` parameter to be a function that, given your dataset_id, returns the dataset **bytes** through your API client. 
 >
-> If in your implementation you need to pass your API `client` to the `select_dataset` tool (as we did in our [custom example](usage_examples\tmpfs_api\ex3_graph\tools.py)), you can do so by simply specifing the `client` as an input parameter. It will be automatically wrapped without any needed changes. 
+> If in your implementation **you need to pass your API `client` to the `select_dataset` tool** (as we did in our [custom example](usage_examples\tmpfs_api\ex3_graph\tools.py)), you can do so by simply specifing `client` as an input parameter. It will be automatically wrapped without any needed changes. 
 
 ## Artifact System
 
@@ -501,15 +472,6 @@ python langgraph_sandbox/sandbox/session_viewer.py sessions/<session_id> --no-st
 - **Container information**: Track container lifecycle and configuration
 - **Performance analysis**: Execution timing and resource usage
 
-
-### Docker Image
-
-The sandbox runs in a custom Docker image with:
-- Python 3.11
-- Common data science packages (pandas, numpy, matplotlib, etc.)
-- Security-hardened configuration
-- Resource limits and timeouts
-
 ## API Reference
 
 ### Artifact API Endpoints
@@ -558,11 +520,26 @@ The sandbox runs in a custom Docker image with:
 - Use `langgraph-sandbox` command
 - Do not run examples directly from their subdirectories
 
+**Docker build failures:**
+- Ensure you've run the setup process: `python -m langgraph_sandbox.setup`
+- The Dockerfile expects `sandbox/repl_server.py` to exist in the build context
+- If you get "COPY sandbox/repl_server.py: not found", run the setup command above
+
+**Session Manager hanging/timeout issues:**
+- This is expected when running SessionManager directly from the host machine
+- The SessionManager is designed to run inside the Docker Compose environment
+- For testing, use the full CLI workflow: `langgraph-sandbox`
+- Container strategy requires proper network configuration (already set up in docker-compose.yml)
+
+**Network connectivity issues:**
+- Ensure Docker Compose is running: `docker compose up -d`
+- Check containers are in the correct network: `docker network inspect langgraph-network`
+- Verify container names follow the pattern: `sbox-{session_id}`
+
 ## Next Steps
 
 - **Quotas**: Add per-session size limits and retention policies
 - **Scalability**: Migrate to Postgres + S3/MinIO for production
 - **Monitoring**: Add metrics and health checks
-- **Extensions**: Support for additional languages and frameworks
 
 For more examples and detailed documentation, see the `usage_examples/` directory.

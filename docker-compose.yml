@@ -1,0 +1,36 @@
+services:
+  # LangGraph Sandbox application
+  langgraph-sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox
+    container_name: langgraph-sandbox
+    environment:
+      # Network configuration for sandbox
+      SANDBOX_ADDRESS_STRATEGY: container
+      COMPOSE_NETWORK: langgraph-network
+      HOST_GATEWAY: host.docker.internal
+      
+      # Other sandbox settings
+      SESSION_STORAGE: TMPFS
+      DATASET_ACCESS: API
+      IN_CHAT_URL: false
+      
+      # Add your API keys here
+      # OPENAI_API_KEY: your_openai_api_key_here
+    networks:
+      - langgraph-network
+    volumes:
+      - ./sessions:/app/sessions
+      - ./blobstore:/app/blobstore
+      - .:/app/workspace  # Mount current directory for your code
+    ports:
+      - "8000:8000"  # Artifacts API
+    stdin_open: true
+    tty: true
+    # command: tail -f /dev/null  # Keep container running - commented out to use default CMD from Dockerfile
+
+networks:
+  langgraph-network:
+    driver: bridge
+    name: langgraph-network

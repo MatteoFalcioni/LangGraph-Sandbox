@@ -1,10 +1,8 @@
-Dockerfile
 MANIFEST.in
 README.md
-docker.env
-example.env
 pyproject.toml
 requirements.txt
+sandbox.env.example
 setup.py
 langgraph_sandbox/__init__.py
 langgraph_sandbox/config.py
@@ -44,11 +42,10 @@ langgraph_sandbox/sandbox/__pycache__/io.cpython-311.pyc
 langgraph_sandbox/sandbox/__pycache__/repl_server.cpython-311.pyc
 langgraph_sandbox/sandbox/__pycache__/session_manager.cpython-310.pyc
 langgraph_sandbox/sandbox/__pycache__/session_manager.cpython-311.pyc
-langgraph_sandbox/setup/Dockerfile
+langgraph_sandbox/setup/Dockerfile.sandbox
 langgraph_sandbox/setup/__init__.py
 langgraph_sandbox/setup/__main__.py
-langgraph_sandbox/setup/docker.env
-langgraph_sandbox/setup/example.env
+langgraph_sandbox/setup/sandbox.env.example
 langgraph_sandbox/setup/__pycache__/__init__.cpython-310.pyc
 langgraph_sandbox/setup/__pycache__/__init__.cpython-311.pyc
 langgraph_sandbox/setup/__pycache__/__main__.cpython-310.pyc

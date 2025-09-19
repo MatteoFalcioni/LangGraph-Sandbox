@@ -87,25 +87,24 @@ async def stage_dataset_into_sandbox(
         raise ValueError("stage_dataset_into_sandbox should only be called in API mode")
 
     # Fetch the dataset bytes
+    print(f"Fetching dataset {ds_id}...")
     data = await fetch_fn(ds_id)
+    print(f"Dataset {ds_id} fetched, size: {len(data)} bytes")
 
     if cfg.is_tmpfs:
-        # Write directly into container tmpfs using a simpler approach
-        # Ensure /session/data directory exists first
-        rc, _ = container.exec_run(["/bin/sh", "-lc", "mkdir -p /session/data"])
-        if rc != 0:
-            raise RuntimeError(f"Failed to create /session/data directory in container (rc={rc})")
-        
-        # Write file using base64 encoding to avoid tar issues
-        import base64
-        encoded_data = base64.b64encode(data).decode('ascii')
+        # Use TAR method instead of base64/echo to avoid argument list too long
         filename = f"{ds_id}.parquet"
+        container_path = f"/session/data/{filename}"
+        print(f"Writing {filename} to container using TAR method...")
         
-        # Write the file using echo and base64 decode
-        cmd = f"echo '{encoded_data}' | base64 -d > /session/data/{filename}"
-        rc, out = container.exec_run(["/bin/sh", "-lc", cmd])
+        # Ensure /session/data directory exists
+        rc, out = container.exec_run(["/bin/sh", "-lc", "mkdir -p /session/data"])
         if rc != 0:
-            raise RuntimeError(f"Failed to write file {filename} to container (rc={rc}): {out}")
+            raise RuntimeError(f"Failed to create /session/data directory in container (rc={rc}, output={out})")
+        
+        # Use the TAR method from io.py - this avoids the argument list too long error
+        put_bytes(container, container_path, data)
+        print(f"Successfully wrote {filename} to container using TAR method")
         
         # Verify the file was written
         rc, out = container.exec_run(["/bin/sh", "-lc", f"ls -la /session/data/{filename}"])
