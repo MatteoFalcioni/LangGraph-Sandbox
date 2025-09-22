@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 import tarfile
 import time
 import shlex
@@ -63,10 +64,12 @@ def put_bytes(container, container_path: str, data: bytes, *, mode: int = 0o644)
     name_in_tar = str(Path(container_path).name)
     tar_bytes = _tar_single_file_bytes(name_in_tar, data, mode=mode)
 
-    # Use streaming method for large files, base64 for small files
-    if len(data) > 1024 * 1024:  # > 1MB
-        # For large files, use streaming approach
-        _write_large_file_streaming(container, container_path, data)
+    # Use chunked method for files that might exceed command line limits
+    # Base64 increases size by ~33%, so we need to be more conservative
+    base64_size = len(data) * 4 // 3  # Approximate base64 size
+    if base64_size > 100 * 1024:  # > 100KB base64 (roughly 75KB original)
+        # For potentially large files, use chunked approach
+        _write_large_file_chunked(container, container_path, data)
     else:
         # For small files, use base64 method (current approach)
         _write_small_file_base64(container, container_path, data)
@@ -139,34 +142,32 @@ def _write_large_file_streaming(container, container_path: str, data: bytes) -> 
 
 
 def _write_large_file_chunked(container, container_path: str, data: bytes) -> None:
-    """Write large files in chunks to avoid command line limits."""
+    """Write large files in small chunks to avoid command line limits."""
     import base64
     
-    # Split data into manageable chunks
-    chunk_size = 64 * 1024  # 64KB chunks
+    # Write file in very small chunks to avoid command line limits
+    chunk_size = 4 * 1024  # 4KB chunks (very small for safety)
     chunks = [data[i:i+chunk_size] for i in range(0, len(data), chunk_size)]
     
-    python_code = f"""
-import base64
-import os
-
-file_path = '{container_path}'
-chunks = {[base64.b64encode(chunk).decode('ascii') for chunk in chunks]}
-
-# Ensure parent directory exists
-os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-# Write the file in chunks
-with open(file_path, 'wb') as f:
-    for chunk_b64 in chunks:
-        f.write(base64.b64decode(chunk_b64))
-
-print(f"Successfully wrote {{file_path}} in {{len(chunks)}} chunks")
-"""
-    
-    rc, out = container.exec_run(["/bin/sh", "-lc", f"python3 -c {shlex.quote(python_code)}"])
+    # Create directory first
+    rc, out = container.exec_run(["/bin/sh", "-lc", f"mkdir -p {shlex.quote(os.path.dirname(container_path))}"])
     if rc != 0:
-        raise RuntimeError(f"Failed to write large file in chunks (rc={rc}, output={out})")
+        raise RuntimeError(f"Failed to create directory (rc={rc}, output={out})")
+    
+    # Write each chunk separately
+    for i, chunk in enumerate(chunks):
+        chunk_b64 = base64.b64encode(chunk).decode('ascii')
+        
+        if i == 0:
+            # First chunk: create file
+            cmd = f"echo '{chunk_b64}' | base64 -d > {shlex.quote(container_path)}"
+        else:
+            # Subsequent chunks: append to file
+            cmd = f"echo '{chunk_b64}' | base64 -d >> {shlex.quote(container_path)}"
+        
+        rc, out = container.exec_run(["/bin/sh", "-lc", cmd])
+        if rc != 0:
+            raise RuntimeError(f"Failed to write chunk {i+1}/{len(chunks)} (rc={rc}, output={out})")
 
 
 def file_exists_in_container(container, container_path: str) -> bool:

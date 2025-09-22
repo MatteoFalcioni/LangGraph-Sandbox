@@ -13,7 +13,7 @@ if __name__ == "__main__":
     project_root = Path(__file__).parent.parent.parent
     sys.path.insert(0, str(project_root))
 
-from ..config import Config, DatasetAccess
+from ..config import Config
 from .cache import write_ids
 
 

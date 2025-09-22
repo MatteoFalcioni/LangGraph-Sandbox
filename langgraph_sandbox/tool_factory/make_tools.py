@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import json
-from typing import Callable, Optional
+from typing import Callable, Optional, Awaitable, Any
 
 from pydantic import BaseModel, Field, ConfigDict
 from typing_extensions import Annotated
 from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
+import os
 
 try:
     # Try relative imports first (when used as a module)
@@ -32,7 +33,7 @@ def make_code_sandbox_tool(
         "Returns stdout and any artifacts from /session/artifacts. "
         "Always use print(...) to show results."
     ),
-    timeout_s: int = 30,
+    timeout_s: int = 120,
 ) -> Callable:
     """
     Factory that returns a LangChain Tool for executing code inside the sandbox.
@@ -77,33 +78,52 @@ def make_code_sandbox_tool(
         }
 
         artifacts = result.get("artifacts", [])
-        
-        # IF configs specify it (in_chat_url=True), include the artifact information in the content for the agent
+
+        # Create structured artifact information for the UI. ALways include it in artifacts to be retrieved in main 
+        structured_artifacts = []
+        if artifacts:
+            for artifact in artifacts:
+                artifact_data = {
+                    "name": artifact.get('name', 'unknown'),
+                    "mime": artifact.get('mime', 'unknown'),
+                    "url": artifact.get('url', ''),
+                    "size": artifact.get('size', 0)
+                }
+                structured_artifacts.append(artifact_data)
+
+        # IF configs specify it (in_chat_url=True), also include the artifact information in the content for the agent
         if cfg.in_chat_url:
-            artifact_info = ""
+        # Create human-readable artifact summary for content
+            artifact_summary = ""
             if artifacts:
-                artifact_info = "\n\n📁 Generated Artifacts:\n"
+                artifact_summary = "\n\n📁 Generated Artifacts:\n"
                 for artifact in artifacts:
                     filename = artifact.get('name', 'unknown')
                     size = artifact.get('size', 0)
                     mime = artifact.get('mime', 'unknown')
                     download_url = artifact.get('url', '')
-                    artifact_info += f"  • {filename} ({mime}, {size} bytes)\n"
+                    artifact_summary += f"  • {filename} ({mime}, {size} bytes)\n"
                     if download_url:
-                        artifact_info += f"    Download: {download_url}\n"
-                artifact_info += "\n"
-
+                        artifact_summary += f"    Download: {download_url}\n"
+                artifact_summary += "\n"        
             # Combine stdout with artifact information
-            content = result.get("stdout", "") + artifact_info + json.dumps(payload, ensure_ascii=False, indent=2)
-
+            content = result.get("stdout", "") + artifact_summary + json.dumps(payload, ensure_ascii=False, indent=2)
         else:
+            # ELSE, only include it in artifacts to be retrieved in main (in_chat_url=False)
             content = json.dumps(payload, ensure_ascii=False, indent=2)
 
-        tool_msg = ToolMessage(
-            content=content,
-            artifact=artifacts,
-            tool_call_id=tool_call_id,
-        )
+        # Only include artifact parameter if there are actually artifacts
+        if len(structured_artifacts) > 0:
+            tool_msg = ToolMessage(
+                content=content,
+                artifact=structured_artifacts,  
+                tool_call_id=tool_call_id,
+            )
+        else:
+            tool_msg = ToolMessage(
+                content=content,
+                tool_call_id=tool_call_id,
+            )
         return Command(update={"messages": [tool_msg]})
 
     # Return a LangChain Tool by applying the decorator at factory time
@@ -118,7 +138,7 @@ def make_select_dataset_tool(
     *,
     session_manager: SessionManager,
     session_key_fn: Callable[[], str] = _default_get_session_key,
-    fetch_fn: Callable[[str], bytes],
+    fetch_fn: Any,
     client: Optional[object] = None,
     name: str = "select_dataset",
     description: str = (
@@ -132,7 +152,7 @@ def make_select_dataset_tool(
     Args:
         session_manager: SessionManager instance to use for container operations
         session_key_fn: Function to get current session key
-        fetch_fn: Function to fetch dataset bytes by ID
+        fetch_fn: Function to fetch dataset bytes by ID (could have also client as input parameter)
         client: Optional client object to pass to fetch_fn
         name: Tool name
         description: Tool description
@@ -174,7 +194,8 @@ def make_select_dataset_tool(
                 async def fetch_dataset_wrapper(ds_id: str) -> bytes:
                     return await fetch_fn(client, ds_id)
             else:
-                fetch_dataset_wrapper = fetch_fn
+                async def fetch_dataset_wrapper(ds_id: str) -> bytes:
+                    return await fetch_fn(ds_id)
             
             # Load the dataset into the sandbox
             container = session_manager.container_for(session_id)
@@ -273,13 +294,21 @@ def make_export_datasets_tool(
         result = session_manager.export_file(session_key, container_path)
         
         if result["success"]:
+            # Create structured artifact for the exported file
+            structured_artifacts = [{
+                "name": result['host_path'].split('/')[-1],  # Extract filename from host path
+                "mime": "application/octet-stream",  # Generic binary file
+                "url": result['download_url'],
+                "size": 0  # Size not available from export result
+            }]
+            
             tool_msg = ToolMessage(
                 content=(
                     f"Successfully exported dataset:\n"
                     f"  Container path: {container_path}\n"
-                    f"  Host path: {result['host_path']}\n"
-                    f"  Download URL: {result['download_url']}"
+                    f"  Host path: {result['host_path']}"
                 ),
+                artifact=structured_artifacts,  # Add artifact field like code_exec does
                 tool_call_id=tool_call_id,
             )
         else:

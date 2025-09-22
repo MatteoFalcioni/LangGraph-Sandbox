@@ -23,7 +23,7 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _resolve_paths(custom_db_path: str = None, custom_blob_dir: str = None) -> Dict[str, Path]:
+def _resolve_paths(custom_db_path: str | None = None, custom_blob_dir: str | None = None) -> Dict[str, Path]:
     root = _project_root()
     
     # Priority: custom parameters > environment variables > defaults
@@ -80,7 +80,7 @@ def _create_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def ensure_artifact_store(custom_db_path: str = None, custom_blob_dir: str = None) -> Dict[str, str]:
+def ensure_artifact_store(custom_db_path: str | None = None, custom_blob_dir: str | None = None) -> Dict[str, str]:
     """
     Creates (if missing):
       - blob folder

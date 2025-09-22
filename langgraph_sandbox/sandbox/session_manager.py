@@ -7,10 +7,12 @@ import uuid
 import os
 import shlex
 import json
+import socket
 from datetime import datetime
 from typing import Dict, Optional, List
 
 import docker            # Host-side Docker SDK (controls containers)
+from docker import errors
 import httpx             # Lightweight HTTP client to talk to the in-container REPL
 from pathlib import Path
 
@@ -201,7 +203,6 @@ class SessionManager:
         
         # Check if host.docker.internal is reachable
         try:
-            import socket
             socket.gethostbyname("host.docker.internal")
             return "host.docker.internal"
         except socket.gaierror:
@@ -432,9 +433,9 @@ with open('/session/python_state.json', 'w') as f:
             if self.session_storage == SessionStorage.BIND:
                 sess_dir = (self.session_root / sid).resolve()
                 sess_dir.mkdir(parents=True, exist_ok=True)
-            self.sessions[sid] = SessionInfo(existing.id, host_port, sess_dir, self.session_storage)
+            self.sessions[sid] = SessionInfo(existing.id or "", host_port, sess_dir, self.session_storage)
             return sid
-        except docker.errors.NotFound:
+        except errors.NotFound:
             pass  # create a new container
         except Exception as e:
             # If there's any other issue with the existing container, remove it and create a new one
@@ -481,7 +482,7 @@ with open('/session/python_state.json', 'w') as f:
             # If we get here, a container with this name exists
             existing_container.stop()
             existing_container.remove()
-        except docker.errors.NotFound:
+        except errors.NotFound:
             # No existing container, which is what we want
             pass
         except Exception as e:
@@ -511,7 +512,7 @@ with open('/session/python_state.json', 'w') as f:
 
         # Wait for /health quickly (best-effort)
         # Register session first so we can use _get_repl_url
-        self.sessions[sid] = SessionInfo(container.id, host_port, sess_dir, self.session_storage)
+        self.sessions[sid] = SessionInfo(container.id or "", host_port, sess_dir, self.session_storage)
         
         with httpx.Client(timeout=5.0) as http:
             for _ in range(50):  # ~5s worst case
@@ -658,7 +659,10 @@ with open('/session/python_state.json', 'w') as f:
                             break
                 if member is None:
                     raise RuntimeError(f"No regular file '{want_name}' in archive ({container_path})")
-                with tar.extractfile(member) as fsrc, open(out_path, "wb") as fdst:
+                fsrc = tar.extractfile(member)
+                if fsrc is None:
+                    raise RuntimeError(f"Could not extract file '{want_name}' from archive")
+                with fsrc, open(out_path, "wb") as fdst:
                     fdst.write(fsrc.read())
             return out_path
 
@@ -673,7 +677,7 @@ with open('/session/python_state.json', 'w') as f:
                 bits, _ = container.get_archive(container_path)
                 data = b"".join(bits)
                 return _extract_one(data, filename, dst_dir / filename)
-            except docker.errors.NotFound:
+            except errors.NotFound:
                 pass
             except Exception:
                 if attempt == 4:
@@ -804,7 +808,7 @@ if session_artifacts.exists():
         if info.session_storage == SessionStorage.TMPFS:
             before = self._list_artifact_files_container(container)
         else:
-            before = self._list_artifact_files_host(info.session_dir)
+            before = self._list_artifact_files_host(info.session_dir) if info.session_dir else set()
 
         # Execute via REPL
         with httpx.Client(timeout=timeout + 5) as http:
@@ -838,7 +842,7 @@ if session_artifacts.exists():
         if info.session_storage == SessionStorage.TMPFS:
             after = self._list_artifact_files_container(container)
         else:
-            after = self._list_artifact_files_host(info.session_dir)
+            after = self._list_artifact_files_host(info.session_dir) if info.session_dir else set()
         new_rel_paths = sorted(after - before)
 
         if info.session_storage == SessionStorage.TMPFS and new_rel_paths:

@@ -13,7 +13,7 @@ GLOBAL_NS = {"__name__": "__main__"}
 
 class ExecRequest(BaseModel):
     code: str
-    timeout: int | None = 30  # seconds
+    timeout: int | None = 120  # seconds
 
 @app.get("/health")
 def health():
@@ -28,7 +28,7 @@ async def exec_code(req: ExecRequest):
             with redirect_stdout(out):
                 # Use one shared dict -> state persists
                 exec(req.code, GLOBAL_NS, GLOBAL_NS)
-        await asyncio.wait_for(run(), timeout=req.timeout or 30)
+        await asyncio.wait_for(run(), timeout=req.timeout or 120)
         return {"ok": True, "stdout": out.getvalue()}
     except asyncio.TimeoutError:
         return {"ok": False, "stdout": out.getvalue(), "error": "Execution timed out."}
