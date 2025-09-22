@@ -142,7 +142,7 @@ class Config:
             raise ValueError(f"{name} must be one of: {allowed} (got: {raw!r})")
 
     @staticmethod
-    def _get_env_value(name: str, default: str = None, env_vars: Optional[Dict[str, str]] = None) -> str:
+    def _get_env_value(name: str, default: str = "", env_vars: Optional[Dict[str, str]] = None) -> str:
         """Get environment variable value, checking file first, then system env."""
         if env_vars and name in env_vars:
             return env_vars[name]
@@ -192,7 +192,7 @@ class Config:
         dataset_access  = cls._get_env_enum("DATASET_ACCESS",  DatasetAccess,  DatasetAccess.API, env_vars)
 
         sessions_root   = Path(cls._get_env_value("SESSIONS_ROOT", "./sessions", env_vars)).resolve()
-        datasets_host_ro_env = cls._get_env_value("DATASETS_HOST_RO", None, env_vars)
+        datasets_host_ro_env = cls._get_env_value("DATASETS_HOST_RO", "", env_vars)
         datasets_host_ro = Path(datasets_host_ro_env).resolve() if datasets_host_ro_env else None
 
         blobstore_dir   = Path(cls._get_env_value("BLOBSTORE_DIR", "./blobstore", env_vars)).resolve()

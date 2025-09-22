@@ -31,6 +31,7 @@ try:
     from .artifacts.api import router as artifacts_router
     from .config import Config
     from .sandbox.container_utils import cleanup_sandbox_containers
+    from .sandbox.session_manager import SessionStorage
     from .artifacts.reader import fetch_artifact_urls
 except ImportError:
     # Fall back to absolute imports (when run directly)
@@ -38,6 +39,7 @@ except ImportError:
     from artifacts.api import router as artifacts_router
     from config import Config
     from sandbox.container_utils import cleanup_sandbox_containers
+    from sandbox.session_manager import SessionStorage
     from artifacts.reader import fetch_artifact_urls
 
 def main():
@@ -79,14 +81,14 @@ def main():
     print(f"✅ Starting new session: {convo_id}")
     
     # Create session manager
-    from .sandbox.session_manager import SessionManager
+    from .sandbox.session_manager import SessionManager, DatasetAccess
     session_manager = SessionManager(
         image=cfg.sandbox_image,
-        session_storage=cfg.session_storage,
-        dataset_access=cfg.dataset_access,
+        session_storage=SessionStorage(cfg.session_storage.value),
+        dataset_access=DatasetAccess(cfg.dataset_access.value),
         datasets_path=cfg.datasets_host_ro,
         session_root=cfg.sessions_root,
-        tmpfs_size=cfg.tmpfs_size_mb,
+        tmpfs_size=str(cfg.tmpfs_size_mb) + "m",
         address_strategy=cfg.sandbox_address_strategy,
         compose_network=cfg.compose_network,
         host_gateway=cfg.host_gateway,
@@ -111,7 +113,7 @@ def main():
     app.include_router(artifacts_router)
     
     # Start artifact server with port fallback
-    server_port = [None]  # Use a list to make it mutable
+    server_port = [0]  # Use a list to make it mutable
     
     def run_server():
         ports_to_try = [8000, 8001, 8002, 8003, 8004]
@@ -231,7 +233,7 @@ def main():
                     # Add timeout to prevent hanging
                     async with asyncio.timeout(60):  # 60 second timeout
                         async for chunk in graph.astream(
-                            {"messages": [{"role": "user", "content": usr_msg}]},
+                            {"messages": [HumanMessage(content=usr_msg)]},
                             {"configurable": {"thread_id": convo_id}, "recursion_limit": 25},
                         ):
                             print(f"{chunk['chat_model']['messages'][-1].content}")

@@ -169,9 +169,9 @@ def show_artifacts(session_dir: Path) -> None:
     print("=== ARTIFACTS ===")
     
     def show_dir_contents(path: Path, indent: int = 0) -> None:
+        prefix = "  " * indent
         try:
             for item in sorted(path.iterdir()):
-                prefix = "  " * indent
                 if item.is_file():
                     size = item.stat().st_size
                     print(f"{prefix}{item.name} ({size} bytes)")

@@ -3,6 +3,7 @@ Utility functions for Docker container management in the sandbox system.
 """
 
 import docker
+from docker import errors
 from typing import List, Optional
 
 
@@ -74,7 +75,7 @@ def cleanup_specific_containers(container_names: List[str], verbose: bool = True
                 removed_containers.append(container_name)
                 if verbose:
                     print(f"  Removed container: {container_name}")
-            except docker.errors.NotFound:
+            except errors.NotFound:
                 if verbose:
                     print(f"  Container not found: {container_name}")
             except Exception as e:
