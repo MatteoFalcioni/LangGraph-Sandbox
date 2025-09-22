@@ -39,6 +39,21 @@ async def load_pending_datasets(
     
     for ds_id in ds_ids:
         try:
+            if cfg.uses_hybrid_mode and cfg.hybrid_local_path:
+                # HYBRID mode: check if dataset exists in heavy_llm_data first
+                local_file_path = cfg.hybrid_local_path / f"{ds_id}.parquet"
+                
+                if local_file_path.exists():
+                    # Dataset exists locally, use it (like LOCAL_RO mode)
+                    path = container_ro_path(cfg, ds_id) # it's mounted at start so just fetch path
+                    desc = {
+                        "id": ds_id,
+                        "path_in_container": path,
+                    }
+                    update_entry_status(cfg, session_id, ds_id, DatasetStatus.LOADED)
+                    out.append(desc)
+                    continue
+            
             if cfg.uses_api_staging:
                 # API mode: actually fetch and stage the dataset
                 desc = await stage_dataset_into_sandbox(
@@ -52,7 +67,7 @@ async def load_pending_datasets(
                 update_entry_status(cfg, session_id, ds_id, DatasetStatus.LOADED)
             else:
                 # RO mode: just update cache status, assume file exists
-                path = container_ro_path(cfg, ds_id)
+                path = container_ro_path(cfg, ds_id) # it's mounted at start so just fetch path
                 desc = {
                     "id": ds_id,
                     "path_in_container": path,
