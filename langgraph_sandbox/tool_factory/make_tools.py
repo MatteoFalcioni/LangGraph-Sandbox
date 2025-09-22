@@ -144,7 +144,7 @@ def make_select_dataset_tool(
     description: str = (
         "Select a dataset to load into sandbox as a parquet file. "
         "This will fetch and stage the dataset immediately. "
-        "In HYBRID mode, this adds to the local datasets already mounted at /data/."
+        "In HYBRID mode, this skips datasets already mounted at /data/."
     ),
 ) -> Callable:
     """
@@ -201,6 +201,8 @@ def make_select_dataset_tool(
             # Load the dataset into the sandbox
             container = session_manager.container_for(session_id)
             
+            # hybrid mode is handled inside load_pending_datasets
+            # if ds is in local it is not fetched
             loaded_datasets = await load_pending_datasets(
                 cfg=cfg,
                 session_id=session_id,
