@@ -143,7 +143,8 @@ def make_select_dataset_tool(
     name: str = "select_dataset",
     description: str = (
         "Select a dataset to load into sandbox as a parquet file. "
-        "This will fetch and stage the dataset immediately."
+        "This will fetch and stage the dataset immediately. "
+        "In HYBRID mode, this adds to the local datasets already mounted at /data/."
     ),
 ) -> Callable:
     """
@@ -260,13 +261,13 @@ def make_export_datasets_tool(
     session_key_fn: Callable[[], str] = _default_get_session_key,
     name: str = "export_datasets",
     description: str = (
-        "Export a modified dataset from /session/data/ to ./exports/modified_datasets/ "
+        "Export a modified dataset from /data/ to ./exports/modified_datasets/ "
         "with timestamp prefix. Use this to save processed or modified datasets "
         "from the sandbox to the host filesystem."
     ),
 ) -> Callable:
     """
-    Create a tool for exporting files from the container's /session/data/ directory.
+    Create a tool for exporting files from the container's /data/ directory.
     
     Parameters:
         session_manager: SessionManager instance to use for container operations
@@ -279,12 +280,12 @@ def make_export_datasets_tool(
     """
     
     class ExportDatasetArgs(BaseModel):
-        container_path: Annotated[str, Field(description="Path to file inside container (e.g., '/session/data/modified_data.parquet')")]
+        container_path: Annotated[str, Field(description="Path to file inside container (e.g., '/data/modified_data.parquet')")]
         tool_call_id: Annotated[str, InjectedToolCallId]
         model_config = ConfigDict(arbitrary_types_allowed=True)
     
     async def _impl(
-        container_path: Annotated[str, "Path to file inside container (e.g., '/session/data/modified_data.parquet')"], 
+        container_path: Annotated[str, "Path to file inside container (e.g., '/data/modified_data.parquet')"], 
         tool_call_id: Annotated[str, InjectedToolCallId]
     ) -> Command:
         """Export a file from container to host filesystem."""
@@ -333,8 +334,9 @@ def make_list_datasets_tool(
     name: str = "list_datasets",
     description: str = (
         "List all datasets available in the sandbox. "
-        "In API mode: lists datasets loaded in /session/data. "
-        "In LOCAL_RO mode: lists statically mounted files in /data."
+        "In API mode: lists datasets loaded in /data. "
+        "In LOCAL_RO mode: lists statically mounted files in /data. "
+        "In HYBRID mode: lists both local mounted files and API-loaded datasets in /data."
     ),
 ) -> Callable:
     """
@@ -372,13 +374,17 @@ def make_list_datasets_tool(
         
         # Determine the path to list based on dataset access mode
         if cfg.dataset_access == DatasetAccess.API:
-            # API mode: list files in /session/data
-            list_path = "/session/data"
+            # API mode: list files in /data
+            list_path = "/data"
             mode_description = "API mode (loaded datasets)"
         elif cfg.dataset_access == DatasetAccess.LOCAL_RO:
             # LOCAL_RO mode: list files in /data
             list_path = "/data"
             mode_description = "LOCAL_RO mode (statically mounted files)"
+        elif cfg.dataset_access == DatasetAccess.HYBRID:
+            # HYBRID mode: list files in /data (both local and API datasets)
+            list_path = "/data"
+            mode_description = "HYBRID mode (local + API datasets)"
         else:
             # NONE mode: no datasets available
             return Command(

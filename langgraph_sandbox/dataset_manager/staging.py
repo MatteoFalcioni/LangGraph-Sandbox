@@ -91,10 +91,10 @@ async def stage_dataset_into_sandbox(
 
     if cfg.is_tmpfs:
         # Write directly into container tmpfs using a simpler approach
-        # Ensure /session/data directory exists first
-        rc, _ = container.exec_run(["/bin/sh", "-lc", "mkdir -p /session/data"])
+        # Ensure /data directory exists first
+        rc, _ = container.exec_run(["/bin/sh", "-lc", "mkdir -p /data"])
         if rc != 0:
-            raise RuntimeError(f"Failed to create /session/data directory in container (rc={rc})")
+            raise RuntimeError(f"Failed to create /data directory in container (rc={rc})")
         
         # Write file using base64 encoding to avoid tar issues
         import base64
@@ -102,13 +102,13 @@ async def stage_dataset_into_sandbox(
         filename = f"{ds_id}.parquet"
         
         # Write the file using echo and base64 decode
-        cmd = f"echo '{encoded_data}' | base64 -d > /session/data/{filename}"
+        cmd = f"echo '{encoded_data}' | base64 -d > /data/{filename}"
         rc, out = container.exec_run(["/bin/sh", "-lc", cmd])
         if rc != 0:
             raise RuntimeError(f"Failed to write file {filename} to container (rc={rc}): {out}")
         
         # Verify the file was written
-        rc, out = container.exec_run(["/bin/sh", "-lc", f"ls -la /session/data/{filename}"])
+        rc, out = container.exec_run(["/bin/sh", "-lc", f"ls -la /data/{filename}"])
         if rc != 0:
             raise RuntimeError(f"Failed to verify file {filename} was written")
     else:

@@ -73,21 +73,38 @@ def test_bind_local_ro_ok(monkeypatch, tmp_path):
     assert c.session_dir("abc123") == (tmp_path / "sessions" / "abc123").resolve()
 
 
+def test_hybrid_mode_ok(monkeypatch, tmp_path):
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("SESSION_STORAGE", "TMPFS")
+    monkeypatch.setenv("DATASET_ACCESS", "HYBRID")
+    monkeypatch.setenv("HYBRID_LOCAL_PATH", str(tmp_path / "hybrid_data"))
+    c = Config.from_env()
+    assert c.session_storage == SessionStorage.TMPFS
+    assert c.dataset_access == DatasetAccess.HYBRID
+    assert c.uses_hybrid_mode
+    assert c.mode_id() == "TMPFS_HYBRID"
+    assert c.hybrid_local_path == (tmp_path / "hybrid_data").resolve()
+
+
 @pytest.mark.parametrize(
-    "sess,dset,expect_mode,needs_ro",
+    "sess,dset,expect_mode,needs_ro,needs_hybrid",
     [
-        ("TMPFS", "API", "TMPFS_API", False),
-        ("BIND",  "API", "BIND_API", False),
-        ("TMPFS", "LOCAL_RO",  "TMPFS_LOCAL", True),
-        ("BIND",  "LOCAL_RO",  "BIND_LOCAL", True),
+        ("TMPFS", "API", "TMPFS_API", False, False),
+        ("BIND",  "API", "BIND_API", False, False),
+        ("TMPFS", "LOCAL_RO",  "TMPFS_LOCAL", True, False),
+        ("BIND",  "LOCAL_RO",  "BIND_LOCAL", True, False),
+        ("TMPFS", "HYBRID", "TMPFS_HYBRID", False, True),
+        ("BIND",  "HYBRID", "BIND_HYBRID", False, True),
     ],
 )
-def test_mode_matrix(monkeypatch, tmp_path, sess, dset, expect_mode, needs_ro):
+def test_mode_matrix(monkeypatch, tmp_path, sess, dset, expect_mode, needs_ro, needs_hybrid):
     _clear_env(monkeypatch)
     monkeypatch.setenv("SESSION_STORAGE", sess)
     monkeypatch.setenv("DATASET_ACCESS", dset)
     if needs_ro:
         monkeypatch.setenv("DATASETS_HOST_RO", str(tmp_path / "ro_data"))
+    if needs_hybrid:
+        monkeypatch.setenv("HYBRID_LOCAL_PATH", str(tmp_path / "hybrid_data"))
     c = Config.from_env()
     assert c.mode_id() == expect_mode
 
