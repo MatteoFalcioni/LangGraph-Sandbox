@@ -473,7 +473,7 @@ with open('/session/python_state.json', 'w') as f:
         if self.dataset_access == DatasetAccess.LOCAL_RO:
             volumes[str(self.datasets_path)] = {"bind": "/data", "mode": "ro"}
         elif self.dataset_access == DatasetAccess.HYBRID:
-            volumes[str(self.hybrid_local_path)] = {"bind": "/data", "mode": "ro"}
+            volumes[str(self.hybrid_local_path)] = {"bind": "/data", "mode": "rw"}
         # NONE and API modes don't mount /data (API datasets are staged to /data)
 
         # Configure networking based on strategy
