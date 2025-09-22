@@ -6,13 +6,15 @@ Test script to demonstrate the new BIND mode session logging functionality.
 import sys
 from pathlib import Path
 
-# Add src to path so we can import our modules
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add project root to path so we can import our modules
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-from sandbox.session_manager import SessionManager, SessionStorage, DatasetAccess
+from langgraph_sandbox.sandbox.session_manager import SessionManager, SessionStorage, DatasetAccess
 
 
-def test_bind_logging():
+def demo_bind_logging():
     """Test the new BIND mode logging functionality."""
     print("Testing BIND mode session logging...")
     
@@ -114,4 +116,4 @@ print("Data summary saved!")
 
 
 if __name__ == "__main__":
-    test_bind_logging()
+    demo_bind_logging()

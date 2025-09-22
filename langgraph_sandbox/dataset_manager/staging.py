@@ -84,7 +84,7 @@ async def stage_dataset_into_sandbox(
     Any exceptions raised by fetch_fn or I/O operations will propagate.
     """
     if not cfg.uses_api_staging:
-        raise ValueError("stage_dataset_into_sandbox should only be called in API mode")
+        raise ValueError("stage_dataset_into_sandbox should only be called in API or HYBRID mode")
 
     # Fetch the dataset bytes
     data = await fetch_fn(ds_id)

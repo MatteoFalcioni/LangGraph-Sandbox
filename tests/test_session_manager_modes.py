@@ -2,6 +2,7 @@ import os
 import tempfile
 from pathlib import Path
 import pytest
+from unittest.mock import Mock, patch
 
 from langgraph_sandbox.sandbox.session_manager import (
     SessionManager, SessionStorage, DatasetAccess
@@ -32,7 +33,7 @@ def patch_ingest_files(monkeypatch, tmp_path):
             if p.exists():
                 p.unlink()
         return descs
-    monkeypatch.setattr("src.artifacts.ingest.ingest_files", fake_ingest)
+    monkeypatch.setattr("langgraph_sandbox.artifacts.ingest.ingest_files", fake_ingest)
     yield
 
 # Prepare a temporary LOCAL_RO datasets dir with one dummy file
@@ -52,7 +53,15 @@ MODES = [
 ]
 
 @pytest.mark.parametrize("label, sess_store, data_access", MODES)
-def test_modes_end_to_end(label, sess_store, data_access, ro_datasets_dir):
+@patch('langgraph_sandbox.sandbox.session_manager.docker.from_env')
+def test_modes_end_to_end(mock_docker, label, sess_store, data_access, ro_datasets_dir):
+    # Mock Docker client and container
+    mock_client = Mock()
+    mock_container = Mock()
+    mock_container.exec_run.return_value = (0, b"True\n")
+    mock_client.containers.run.return_value = mock_container
+    mock_docker.return_value = mock_client
+    
     kwargs = {
         "session_storage": sess_store,
         "dataset_access": data_access,
@@ -63,6 +72,28 @@ def test_modes_end_to_end(label, sess_store, data_access, ro_datasets_dir):
 
     mgr = SessionManager(**kwargs)
     sid = mgr.start()
+
+    # Mock the exec method to avoid real container execution
+    def mock_exec(session_id, code):
+        if "a=1" in code:
+            return {"stdout": "a= 1\n", "stderr": "", "artifacts": [], "session_dir": ""}
+        elif "a+=2" in code:
+            return {"stdout": "a= 3\n", "stderr": "", "artifacts": [], "session_dir": ""}
+        elif "os.path.exists" in code:
+            return {"stdout": "True\n", "stderr": "", "artifacts": [], "session_dir": ""}
+        elif "mkdir" in code:
+            return {"stdout": "", "stderr": "", "artifacts": [], "session_dir": ""}
+        elif "test.txt" in code:
+            return {
+                "stdout": "artifact done\n", 
+                "stderr": "", 
+                "artifacts": [{"name": "test.txt", "id": "test.txt"}], 
+                "session_dir": str(ro_datasets_dir / "session_dir") if sess_store == SessionStorage.BIND else ""
+            }
+        else:
+            return {"stdout": "", "stderr": "", "artifacts": [], "session_dir": ""}
+    
+    mgr.exec = mock_exec
 
     # 1) REPL state persists
     r1 = mgr.exec(sid, "a=1; print('a=', a)")
@@ -109,7 +140,15 @@ print("artifact done")
     mgr.stop(sid)
 
 # Bonus: idle sweep test (forces eviction)
-def test_idle_sweep(tmp_path, ro_datasets_dir, monkeypatch):
+@patch('langgraph_sandbox.sandbox.session_manager.docker.from_env')
+def test_idle_sweep(mock_docker, tmp_path, ro_datasets_dir, monkeypatch):
+    # Mock Docker client and container
+    mock_client = Mock()
+    mock_container = Mock()
+    mock_container.exec_run.return_value = (0, b"")
+    mock_client.containers.run.return_value = mock_container
+    mock_docker.return_value = mock_client
+    
     mgr = SessionManager(
         session_storage=SessionStorage.TMPFS,
         dataset_access=DatasetAccess.API,

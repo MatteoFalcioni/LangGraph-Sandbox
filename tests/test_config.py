@@ -45,27 +45,34 @@ def test_defaults_mode_tmpfs_api(monkeypatch, tmp_path):
     assert c.artifacts_db_path.name == "artifacts.db"
 
 
-def test_local_ro_requires_host_path(monkeypatch):
+def test_local_ro_requires_host_path(monkeypatch, tmp_path):
     _clear_env(monkeypatch)
-    monkeypatch.setenv("DATASET_ACCESS", "LOCAL_RO")
+    # Create a temporary env file with LOCAL_RO but no DATASETS_HOST_RO
+    env_file = tmp_path / "test.env"
+    env_file.write_text("DATASET_ACCESS=LOCAL_RO\n")
     with pytest.raises(ValueError):
-        Config.from_env()
+        Config.from_env(env_file_path=env_file)
 
 
-def test_hybrid_requires_hybrid_path(monkeypatch):
+def test_hybrid_requires_hybrid_path(monkeypatch, tmp_path):
     _clear_env(monkeypatch)
-    monkeypatch.setenv("DATASET_ACCESS", "HYBRID")
+    # Create a temporary env file with HYBRID but no HYBRID_LOCAL_PATH
+    env_file = tmp_path / "test.env"
+    env_file.write_text("DATASET_ACCESS=HYBRID\n")
     with pytest.raises(ValueError, match="HYBRID_LOCAL_PATH is required when DATASET_ACCESS=HYBRID"):
-        Config.from_env()
+        Config.from_env(env_file_path=env_file)
 
 
 def test_bind_local_ro_ok(monkeypatch, tmp_path):
     _clear_env(monkeypatch)
-    monkeypatch.setenv("SESSION_STORAGE", "BIND")
-    monkeypatch.setenv("DATASET_ACCESS", "LOCAL_RO")
-    monkeypatch.setenv("DATASETS_HOST_RO", str(tmp_path / "llm_data"))
-    monkeypatch.setenv("SESSIONS_ROOT", str(tmp_path / "sessions"))
-    c = Config.from_env()
+    # Create a temporary env file with BIND + LOCAL_RO
+    env_file = tmp_path / "test.env"
+    env_file.write_text(f"""SESSION_STORAGE=BIND
+DATASET_ACCESS=LOCAL_RO
+DATASETS_HOST_RO={tmp_path / "llm_data"}
+SESSIONS_ROOT={tmp_path / "sessions"}
+""")
+    c = Config.from_env(env_file_path=env_file)
     assert c.is_bind
     assert c.uses_local_ro
     assert c.mode_id() == "BIND_LOCAL"
@@ -75,10 +82,13 @@ def test_bind_local_ro_ok(monkeypatch, tmp_path):
 
 def test_hybrid_mode_ok(monkeypatch, tmp_path):
     _clear_env(monkeypatch)
-    monkeypatch.setenv("SESSION_STORAGE", "TMPFS")
-    monkeypatch.setenv("DATASET_ACCESS", "HYBRID")
-    monkeypatch.setenv("HYBRID_LOCAL_PATH", str(tmp_path / "hybrid_data"))
-    c = Config.from_env()
+    # Create a temporary env file with TMPFS + HYBRID
+    env_file = tmp_path / "test.env"
+    env_file.write_text(f"""SESSION_STORAGE=TMPFS
+DATASET_ACCESS=HYBRID
+HYBRID_LOCAL_PATH={tmp_path / "hybrid_data"}
+""")
+    c = Config.from_env(env_file_path=env_file)
     assert c.session_storage == SessionStorage.TMPFS
     assert c.dataset_access == DatasetAccess.HYBRID
     assert c.uses_hybrid_mode
@@ -99,13 +109,15 @@ def test_hybrid_mode_ok(monkeypatch, tmp_path):
 )
 def test_mode_matrix(monkeypatch, tmp_path, sess, dset, expect_mode, needs_ro, needs_hybrid):
     _clear_env(monkeypatch)
-    monkeypatch.setenv("SESSION_STORAGE", sess)
-    monkeypatch.setenv("DATASET_ACCESS", dset)
+    # Create a temporary env file with the test configuration
+    env_file = tmp_path / "test.env"
+    env_content = f"SESSION_STORAGE={sess}\nDATASET_ACCESS={dset}\n"
     if needs_ro:
-        monkeypatch.setenv("DATASETS_HOST_RO", str(tmp_path / "ro_data"))
+        env_content += f"DATASETS_HOST_RO={tmp_path / 'ro_data'}\n"
     if needs_hybrid:
-        monkeypatch.setenv("HYBRID_LOCAL_PATH", str(tmp_path / "hybrid_data"))
-    c = Config.from_env()
+        env_content += f"HYBRID_LOCAL_PATH={tmp_path / 'hybrid_data'}\n"
+    env_file.write_text(env_content)
+    c = Config.from_env(env_file_path=env_file)
     assert c.mode_id() == expect_mode
 
 
@@ -120,10 +132,20 @@ def test_case_insensitive_env(monkeypatch):
 
 def test_overrides(monkeypatch, tmp_path):
     _clear_env(monkeypatch)
-    monkeypatch.setenv("TMPFS_SIZE_MB", "2048")
-    monkeypatch.setenv("BLOBSTORE_DIR", str(tmp_path / "blobs"))
-    monkeypatch.setenv("ARTIFACTS_DB", str(tmp_path / "artifacts.sqlite"))
-    c = Config.from_env()
+    # Create a temporary env file with overrides
+    env_file = tmp_path / "test.env"
+    env_file.write_text(f"""TMPFS_SIZE_MB=2048
+BLOBSTORE_DIR={tmp_path / "blobs"}
+ARTIFACTS_DB={tmp_path / "artifacts.sqlite"}
+""")
+    c = Config.from_env(env_file_path=env_file)
     assert c.tmpfs_size_mb == 2048
     assert c.blobstore_dir == (tmp_path / "blobs").resolve()
     assert c.artifacts_db_path == (tmp_path / "artifacts.sqlite").resolve()
+
+
+def test_unified_data_path():
+    """Test that both API and LOCAL_RO modes use unified /data/ path."""
+    c = Config.from_env()
+    assert c.container_data_staged == "/data"
+    assert c.container_data_ro == "/data"

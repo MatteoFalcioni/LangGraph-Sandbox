@@ -65,7 +65,7 @@ class Config:
 
     @property
     def uses_api_staging(self) -> bool:
-        return self.dataset_access == DatasetAccess.API
+        return self.dataset_access in [DatasetAccess.API, DatasetAccess.HYBRID]
 
     @property
     def uses_local_ro(self) -> bool:
@@ -99,14 +99,14 @@ class Config:
             return "BIND_LOCAL"  # "C"
         if self.is_tmpfs and self.uses_local_ro:
             return "TMPFS_LOCAL"  # "D"
-        if self.is_tmpfs and self.uses_api_staging:
-            return "TMPFS_API"  # "E"
-        if self.is_bind and self.uses_api_staging:
-            return "BIND_API"  # "F"
         if self.is_tmpfs and self.uses_hybrid_mode:
             return "TMPFS_HYBRID"  # "G"
         if self.is_bind and self.uses_hybrid_mode:
             return "BIND_HYBRID"  # "H"
+        if self.is_tmpfs and self.uses_api_staging:
+            return "TMPFS_API"  # "E"
+        if self.is_bind and self.uses_api_staging:
+            return "BIND_API"  # "F"
         return "BIND_API"  # fallback
 
     def session_dir(self, session_id: str) -> Path:
