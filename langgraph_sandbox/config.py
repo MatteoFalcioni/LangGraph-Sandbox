@@ -19,6 +19,7 @@ class DatasetAccess(str, Enum):
     NONE      = "NONE"       # no datasets - simple sandbox mode
     LOCAL_RO  = "LOCAL_RO"   # host datasets mounted read-only at /data
     API = "API"  # datasets fetched on demand into /session/data
+    HYBRID = "HYBRID"        # API + local datasets mounted at /hybrid_data
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,7 @@ class Config:
     # --- paths (host-side) ---
     sessions_root: Path = Path("./sessions")      # for BIND mode and saving logs/registry
     datasets_host_ro: Optional[Path] = None       # required if DatasetAccess=LOCAL_RO
+    hybrid_local_path: Optional[Path] = None      # required if DatasetAccess=HYBRID
     blobstore_dir: Path = Path("./blobstore")
     artifacts_db_path: Path = Path("./artifacts.db")
     cache_filename: str = "cache_datasets.json"   # filename for dataset cache within session dir
@@ -48,7 +50,7 @@ class Config:
 
     # --- in-container canonical paths (do not change lightly) ---
     container_session_path: str = "/session"
-    container_data_staged: str  = "/session/data"  # for API
+    container_data_staged: str  = "/data"          # for API (unified with LOCAL_RO)
     container_data_ro: str      = "/data"          # for LOCAL_RO
 
     # ---------- helpers ----------
@@ -73,6 +75,10 @@ class Config:
     def uses_no_datasets(self) -> bool:
         return self.dataset_access == DatasetAccess.NONE
 
+    @property
+    def uses_hybrid_mode(self) -> bool:
+        return self.dataset_access == DatasetAccess.HYBRID
+
     def mode_id(self) -> str:
         """
         Returns the identifier from the README table:
@@ -82,6 +88,8 @@ class Config:
           TMPFS_LOCAL: TMPFS + LOCAL_RO
           TMPFS_API: TMPFS + API (default)
           BIND_API: BIND + API
+          TMPFS_HYBRID: TMPFS + HYBRID
+          BIND_HYBRID: BIND + HYBRID
         """
         if self.is_bind and self.uses_no_datasets:
             return "BIND_NONE"  # "A"
@@ -93,7 +101,13 @@ class Config:
             return "TMPFS_LOCAL"  # "D"
         if self.is_tmpfs and self.uses_api_staging:
             return "TMPFS_API"  # "E"
-        return "BIND_API"  # "F"
+        if self.is_bind and self.uses_api_staging:
+            return "BIND_API"  # "F"
+        if self.is_tmpfs and self.uses_hybrid_mode:
+            return "TMPFS_HYBRID"  # "G"
+        if self.is_bind and self.uses_hybrid_mode:
+            return "BIND_HYBRID"  # "H"
+        return "BIND_API"  # fallback
 
     def session_dir(self, session_id: str) -> Path:
         """Host-side folder for this session (used in BIND mode and for logs/exports)."""
@@ -160,9 +174,10 @@ class Config:
         
         Environment variables:
           - SESSION_STORAGE = TMPFS | BIND           (default: TMPFS)
-          - DATASET_ACCESS  = NONE | LOCAL_RO | API   (default: API)
+          - DATASET_ACCESS  = NONE | LOCAL_RO | API | HYBRID   (default: API)
           - SESSIONS_ROOT   = ./sessions
           - DATASETS_HOST_RO= ./example_llm_data     (required if LOCAL_RO)
+          - HYBRID_LOCAL_PATH = ./heavy_llm_data     (required if HYBRID)
           - BLOBSTORE_DIR   = ./blobstore
           - ARTIFACTS_DB    = ./artifacts.db
           - CACHE_FILENAME  = cache_datasets.json     (default: cache_datasets.json)
@@ -194,6 +209,9 @@ class Config:
         sessions_root   = Path(cls._get_env_value("SESSIONS_ROOT", "./sessions", env_vars)).resolve()
         datasets_host_ro_env = cls._get_env_value("DATASETS_HOST_RO", "", env_vars)
         datasets_host_ro = Path(datasets_host_ro_env).resolve() if datasets_host_ro_env else None
+        
+        hybrid_local_path_env = cls._get_env_value("HYBRID_LOCAL_PATH", "", env_vars)
+        hybrid_local_path = Path(hybrid_local_path_env).resolve() if hybrid_local_path_env else None
 
         blobstore_dir   = Path(cls._get_env_value("BLOBSTORE_DIR", "./blobstore", env_vars)).resolve()
         artifacts_db    = Path(cls._get_env_value("ARTIFACTS_DB", "./artifacts.db", env_vars)).resolve()
@@ -212,6 +230,10 @@ class Config:
             if not datasets_host_ro:
                 raise ValueError("DATASETS_HOST_RO is required when DATASET_ACCESS=LOCAL_RO")
             # Don't force existence here; create/mount logic can handle it, but warn early if missing.
+        elif dataset_access == DatasetAccess.HYBRID:
+            if not hybrid_local_path:
+                raise ValueError("HYBRID_LOCAL_PATH is required when DATASET_ACCESS=HYBRID")
+            # Don't force existence here; create/mount logic can handle it, but warn early if missing.
         elif dataset_access == DatasetAccess.NONE:
             # NONE mode doesn't need datasets_host_ro
             datasets_host_ro = None
@@ -220,6 +242,7 @@ class Config:
             dataset_access=dataset_access,
             sessions_root=sessions_root,
             datasets_host_ro=datasets_host_ro,
+            hybrid_local_path=hybrid_local_path,
             blobstore_dir=blobstore_dir,
             artifacts_db_path=artifacts_db,
             cache_filename=cache_filename,

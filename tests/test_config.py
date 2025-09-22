@@ -18,6 +18,7 @@ ENV_KEYS = [
     "DATASET_ACCESS",
     "SESSIONS_ROOT",
     "DATASETS_HOST_RO",
+    "HYBRID_LOCAL_PATH",
     "BLOBSTORE_DIR",
     "ARTIFACTS_DB",
     "SANDBOX_IMAGE",
@@ -48,6 +49,13 @@ def test_local_ro_requires_host_path(monkeypatch):
     _clear_env(monkeypatch)
     monkeypatch.setenv("DATASET_ACCESS", "LOCAL_RO")
     with pytest.raises(ValueError):
+        Config.from_env()
+
+
+def test_hybrid_requires_hybrid_path(monkeypatch):
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("DATASET_ACCESS", "HYBRID")
+    with pytest.raises(ValueError, match="HYBRID_LOCAL_PATH is required when DATASET_ACCESS=HYBRID"):
         Config.from_env()
 
 

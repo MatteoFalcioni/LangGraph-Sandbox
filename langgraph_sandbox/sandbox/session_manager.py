@@ -37,8 +37,9 @@ class SessionStorage(str, Enum):
 
 class DatasetAccess(str, Enum):
     NONE      = "NONE"        # no datasets - simple sandbox mode
-    API = "API"   # datasets fetched via API into /session/data
+    API = "API"   # datasets fetched via API into /data
     LOCAL_RO  = "LOCAL_RO"    # host datasets mounted read-only at /data
+    HYBRID = "HYBRID"         # local datasets + API datasets, both in /data
 
 
 # Docker exposes port mappings as "<container_port>/tcp" in the attrs.
@@ -109,6 +110,7 @@ class SessionManager:
         session_storage: SessionStorage = SessionStorage.TMPFS,
         dataset_access: DatasetAccess = DatasetAccess.API,
         datasets_path: Optional[Path] = None,
+        hybrid_local_path: Optional[Path] = None,
         session_root: Path = Path("sessions"),
         tmpfs_size: str = "1g",
         address_strategy: str = "container",
@@ -119,8 +121,9 @@ class SessionManager:
         Args:
             image: Docker image name for the sandbox.
             session_storage: Where /session is backed (TMPFS or BIND).
-            dataset_access: How datasets are exposed (API or LOCAL_RO).
+            dataset_access: How datasets are exposed (API, LOCAL_RO, or HYBRID).
             datasets_path: Required when dataset_access=LOCAL_RO; mounted at /data (RO).
+            hybrid_local_path: Required when dataset_access=HYBRID; mounted at /data (RO).
             session_root: Base host dir for per-session folders when using BIND.
             tmpfs_size: Soft cap (e.g., "1g", "512m") for /session when using TMPFS.
             address_strategy: "container" for Docker network DNS, "host" for port mapping.
@@ -137,9 +140,16 @@ class SessionManager:
             if not datasets_path:
                 raise ValueError("datasets_path is required when dataset_access=LOCAL_RO")
             self.datasets_path = Path(datasets_path).resolve()
+            self.hybrid_local_path = None
+        elif self.dataset_access == DatasetAccess.HYBRID:
+            if not hybrid_local_path:
+                raise ValueError("hybrid_local_path is required when dataset_access=HYBRID")
+            self.hybrid_local_path = Path(hybrid_local_path).resolve()
+            self.datasets_path = None
         else:
             # NONE or API -> Do not mount /data
             self.datasets_path = None
+            self.hybrid_local_path = None
 
         self.session_root = Path(session_root).resolve()
         self.tmpfs_size = tmpfs_size
@@ -459,10 +469,12 @@ with open('/session/python_state.json', 'w') as f:
         else:
             volumes[str(sess_dir)] = {"bind": "/session", "mode": "rw"}
 
-        # /data (datasets) only if LOCAL_RO
+        # /data (datasets) mount based on dataset access mode
         if self.dataset_access == DatasetAccess.LOCAL_RO:
             volumes[str(self.datasets_path)] = {"bind": "/data", "mode": "ro"}
-        # NONE and API modes don't mount /data
+        elif self.dataset_access == DatasetAccess.HYBRID:
+            volumes[str(self.hybrid_local_path)] = {"bind": "/data", "mode": "ro"}
+        # NONE and API modes don't mount /data (API datasets are staged to /data)
 
         # Configure networking based on strategy
         if self.address_strategy == "container":
@@ -681,7 +693,7 @@ with open('/session/python_state.json', 'w') as f:
                 bits, _ = container.get_archive(parent)
                 data = b"".join(bits)
                 return _extract_one(data, filename, dst_dir / filename)
-            except docker.errors.NotFound:
+            except errors.NotFound:
                 pass
             except Exception:
                 if attempt == 4:
@@ -947,11 +959,11 @@ if session_artifacts.exists():
 
     def export_file(self, session_key: str, container_path: str) -> dict:
         """
-        Export a file from the container's /session/data/ directory to the host.
+        Export a file from the container's /data/ directory to the host.
         
         Parameters:
             session_key: Session identifier
-            container_path: Path to file inside container (must start with /session/data/)
+            container_path: Path to file inside container (must start with /data/)
             
         Returns:
             dict with keys:
@@ -970,10 +982,10 @@ if session_artifacts.exists():
         info = self.sessions[session_key]
         
         # Validate container path
-        if not container_path.startswith("/session/data/"):
+        if not container_path.startswith("/data/"):
             return {
                 "success": False,
-                "error": "Path must be in /session/data/ directory"
+                "error": "Path must be in /data/ directory"
             }
         
         # Check if file exists in container

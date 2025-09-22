@@ -38,7 +38,7 @@ This sandbox replaces services like E2B by running isolated Docker containers fo
 
 ## Execution Modes
 
-The system offers six execution modes based on two independent configuration knobs:
+The system offers eight execution modes based on two independent configuration knobs:
 
 | Mode | Session Storage | Dataset Access | Description | Best For |
 |------|----------------|----------------|-------------|----------|
@@ -48,12 +48,15 @@ The system offers six execution modes based on two independent configuration kno
 | **BIND_LOCAL** | Disk (BIND) | Local RO | Persistent + host datasets | Full development with datasets |
 | **TMPFS_API** | RAM (TMPFS) | API | Memory + API datasets | Multi-tenant, cloud datasets |
 | **BIND_API** | Disk (BIND) | API | Persistent + API datasets | Development with API datasets |
+| **TMPFS_HYBRID** | RAM (TMPFS) | Hybrid | Memory + local + API datasets | Best of both worlds |
+| **BIND_HYBRID** | Disk (BIND) | Hybrid | Persistent + local + API datasets | Full development with mixed datasets |
 
 ### Recommended Defaults
 
 - **Simple coding**: `TMPFS_NONE` - Perfect for general-purpose coding without datasets
 - **Production demos**: `TMPFS_API` - Multi-tenant with dynamic dataset loading
 - **Local development**: `BIND_LOCAL` - Full debugging with local datasets
+- **Mixed datasets**: `TMPFS_HYBRID` - Local datasets + API fetching for maximum flexibility
 
 ## Quick Start
 
@@ -164,7 +167,7 @@ Configuration is managed through environment variables with sensible defaults:
 
 # --- Core knobs ---
 SESSION_STORAGE=TMPFS        # TMPFS | BIND
-DATASET_ACCESS=API           # API | LOCAL_RO | NONE
+DATASET_ACCESS=API           # API | LOCAL_RO | NONE | HYBRID
 
 # --- Host paths ---
 SESSIONS_ROOT=./sessions
@@ -173,6 +176,9 @@ ARTIFACTS_DB=./artifacts.db
 
 # Required ONLY if DATASET_ACCESS=LOCAL_RO
 # DATASETS_HOST_RO=./example_llm_data
+
+# Required ONLY if DATASET_ACCESS=HYBRID
+# HYBRID_LOCAL_PATH=./heavy_llm_data
 
 # --- Docker / runtime ---
 SANDBOX_IMAGE=sandbox:latest
@@ -208,6 +214,13 @@ langgraph-sandbox
 **Local development:**
 
 In `sandbox.env`, set `SESSION_STORAGE=BIND`, `DATASET_ACCESS=LOCAL_RO` and `DATASETS_HOST_RO=./`, then:
+```bash
+langgraph-sandbox
+```
+
+**Hybrid mode (local + API datasets):**
+
+In `sandbox.env`, set `DATASET_ACCESS=HYBRID` and `HYBRID_LOCAL_PATH=./heavy_llm_data`, then:
 ```bash
 langgraph-sandbox
 ```
@@ -356,7 +369,7 @@ The system provides **production-ready LangGraph tools** out of the box through 
 - Memory cleanup to prevent container bloat
 - Session-pinned containers for consistency
 
-**`make_select_dataset_tool`** - Load datasets on-demand (**only in API mode**)
+**`make_select_dataset_tool`** - Load datasets on-demand (**API and HYBRID modes**)
 - Fetches datasets from your API sources
 - Stages them directly into the sandbox
 - Smart caching with PENDING/LOADED/FAILED status tracking
@@ -365,11 +378,12 @@ The system provides **production-ready LangGraph tools** out of the box through 
 **`make_export_datasets_tool`** - Export modified datasets to host filesystem
 - Timestamped exports to prevent overwrites
 - Automatic artifact ingestion for download URLs
-- Works with any file in `/session/data/`
+- Works with any file in `/data/`
 
 **`make_list_datasets_tool`** - List available datasets in the sandbox
-- **API mode**: Lists datasets loaded in `/session/data` (dynamically loaded datasets)
+- **API mode**: Lists datasets loaded in `/data` (dynamically loaded datasets)
 - **LOCAL_RO mode**: Lists statically mounted files in `/data` (host-mounted datasets)
+- **HYBRID mode**: Lists both local mounted files and API-loaded datasets in `/data`
 - **NONE mode**: Returns message indicating no datasets are available
 - Provides detailed file information including size, modification time, and paths
 
