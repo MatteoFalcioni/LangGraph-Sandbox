@@ -11,12 +11,14 @@ def _b64u_dec(s: str) -> bytes:
     pad = "=" * (-len(s) % 4)
     return base64.urlsafe_b64decode(s + pad)
 
-# Generate a secure secret at module load time
-_SECRET = secrets.token_urlsafe(32).encode("utf-8")
-
 def _secret() -> bytes:
-    """Get the secret key for token signing. Generated automatically at startup."""
-    return _SECRET
+    """Get the secret key for token signing. Uses ARTIFACTS_SECRET env var or generates one."""
+    secret = os.getenv("ARTIFACTS_SECRET")
+    if secret:
+        return secret.encode("utf-8")
+    else:
+        # Fallback to random secret if no env var set
+        return secrets.token_urlsafe(32).encode("utf-8")
 
 def _ttl() -> int:
     try:
