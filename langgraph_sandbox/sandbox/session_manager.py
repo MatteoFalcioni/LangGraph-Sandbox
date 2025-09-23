@@ -542,9 +542,9 @@ with open('/session/python_state.json', 'w') as f:
         
         # Create required directories in the container
         try:
-            # Create /to_export and /modified_data directories with proper permissions
-            container.exec_run(["mkdir", "-p", "/to_export", "/modified_data"], user="root")
-            container.exec_run(["chmod", "777", "/to_export", "/modified_data"], user="root")
+            # Create /to_export, /modified_data, and /session/artifacts directories with proper permissions
+            container.exec_run(["mkdir", "-p", "/to_export", "/modified_data", "/session/artifacts"], user="root")
+            container.exec_run(["chmod", "777", "/to_export", "/modified_data", "/session/artifacts"], user="root")
         except Exception as e:
             print(f"Warning: Could not create directories: {e}")
         
