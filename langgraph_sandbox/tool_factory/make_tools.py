@@ -287,7 +287,7 @@ def make_export_datasets_tool(
         model_config = ConfigDict(arbitrary_types_allowed=True)
     
     async def _impl(
-        container_path: Annotated[str, "Path to file inside container (e.g., '/to_export/<name>.parquet')"], 
+        container_path: Annotated[str, "Path to file inside container in the to_export/ directory (e.g., '/to_export/<name>.parquet')"], 
         tool_call_id: Annotated[str, InjectedToolCallId]
     ) -> Command:
         """Export a file from container to host filesystem."""
@@ -370,7 +370,10 @@ def make_list_datasets_tool(
         # Load configuration to determine dataset access mode
         cfg = Config.from_env()
         session_key = session_key_fn()
-
+        
+        # Start the session if not already started
+        session_manager.start(session_key)
+        
         # Determine the path to list based on dataset access mode
         if cfg.dataset_access == DatasetAccess.API:
             # API mode: list files in /data
