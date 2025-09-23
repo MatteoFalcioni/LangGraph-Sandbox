@@ -74,6 +74,7 @@ def put_bytes(container, container_path: str, data: bytes, *, mode: int = 0o644)
         raise RuntimeError(f"Failed to create directory '/{parent}' in container (rc={rc})")
 
     # Try put_archive first, but fallback to direct write if it fails
+    # Always failes btw... maybe could remove it entirely adn go with bytes
     try:
         ok = container.put_archive(path="/data", data=tar_bytes)
         
