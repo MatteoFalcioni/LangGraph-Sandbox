@@ -263,7 +263,7 @@ def make_export_datasets_tool(
     session_key_fn: Callable[[], str] = _default_get_session_key,
     name: str = "export_datasets",
     description: str = (
-        "Export a modified dataset from /data/ to ./exports/modified_datasets/ "
+        "Export a modified dataset from /to_export/ to ./exports/modified_datasets/ "
         "with timestamp prefix. Use this to save processed or modified datasets "
         "from the sandbox to the host filesystem."
     ),
@@ -282,12 +282,12 @@ def make_export_datasets_tool(
     """
     
     class ExportDatasetArgs(BaseModel):
-        container_path: Annotated[str, Field(description="Path to file inside container (e.g., '/data/modified_data.parquet')")]
+        container_path: Annotated[str, Field(description="Path to file inside container (e.g., '/to_export/<name>.parquet')")]
         tool_call_id: Annotated[str, InjectedToolCallId]
         model_config = ConfigDict(arbitrary_types_allowed=True)
     
     async def _impl(
-        container_path: Annotated[str, "Path to file inside container (e.g., '/data/modified_data.parquet')"], 
+        container_path: Annotated[str, "Path to file inside container (e.g., '/to_export/<name>.parquet')"], 
         tool_call_id: Annotated[str, InjectedToolCallId]
     ) -> Command:
         """Export a file from container to host filesystem."""
@@ -370,10 +370,7 @@ def make_list_datasets_tool(
         # Load configuration to determine dataset access mode
         cfg = Config.from_env()
         session_key = session_key_fn()
-        
-        # Start the session if not already started
-        session_manager.start(session_key)
-        
+
         # Determine the path to list based on dataset access mode
         if cfg.dataset_access == DatasetAccess.API:
             # API mode: list files in /data
@@ -384,7 +381,7 @@ def make_list_datasets_tool(
             list_path = "/data"
             mode_description = "LOCAL_RO mode (statically mounted files)"
         elif cfg.dataset_access == DatasetAccess.HYBRID:
-            # HYBRID mode: list files in /data (both local and API datasets)
+            # HYBRID mode: list files in both /data (API) and /heavy_data (local)
             list_path = "/data"
             mode_description = "HYBRID mode (local + API datasets)"
         else:
@@ -401,7 +398,57 @@ def make_list_datasets_tool(
             )
         
         # Execute code to list files in the appropriate directory
-        list_code = f"""
+        if cfg.dataset_access == DatasetAccess.HYBRID:
+            # HYBRID mode: list both /data and /heavy_data
+            list_code = f"""
+import os
+import json
+from pathlib import Path
+
+files = []
+
+# List /data (API datasets)
+data_path = "/data"
+if os.path.exists(data_path):
+    for item in os.listdir(data_path):
+        item_path = os.path.join(data_path, item)
+        if os.path.isfile(item_path):
+            stat = os.stat(item_path)
+            files.append({{
+                "name": item,
+                "path": item_path,
+                "size": stat.st_size,
+                "modified": stat.st_mtime,
+                "source": "API"
+            }})
+
+# List /heavy_data (local datasets)
+heavy_data_path = "/heavy_data"
+if os.path.exists(heavy_data_path):
+    for item in os.listdir(heavy_data_path):
+        item_path = os.path.join(heavy_data_path, item)
+        if os.path.isfile(item_path):
+            stat = os.stat(item_path)
+            files.append({{
+                "name": item,
+                "path": item_path,
+                "size": stat.st_size,
+                "modified": stat.st_mtime,
+                "source": "Local"
+            }})
+
+result = {{
+    "mode": "{mode_description}",
+    "path": "/data and /heavy_data",
+    "files": files,
+    "count": len(files)
+}}
+
+print(json.dumps(result, indent=2))
+"""
+        else:
+            # Other modes: list single directory
+            list_code = f"""
 import os
 import json
 from pathlib import Path
@@ -445,7 +492,13 @@ print(json.dumps(result, indent=2))
         if result.get("error"):
             content = f"Error listing datasets: {result['error']}"
         else:
-            content = f"Datasets in {mode_description}:\n\n{result.get('stdout', 'No output')}"
+            stdout = result.get("stdout", "")
+            # Parse the JSON output
+            try:
+                result_data = json.loads(stdout)
+                content = f"Datasets in {mode_description}:\n\n{json.dumps(result_data, indent=2)}"
+            except json.JSONDecodeError as e:
+                content = f"Error parsing JSON output: {e}\nRaw output: {stdout}"
         
         return Command(
             update={
