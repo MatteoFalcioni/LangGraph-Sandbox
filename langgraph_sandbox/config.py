@@ -211,7 +211,8 @@ class Config:
         datasets_host_ro = Path(datasets_host_ro_env).resolve() if datasets_host_ro_env else None
         
         hybrid_local_path_env = cls._get_env_value("HYBRID_LOCAL_PATH", "", env_vars)
-        hybrid_local_path = Path(hybrid_local_path_env).resolve() if hybrid_local_path_env else None
+        # Don't resolve paths when running in Docker - use them as-is for volume mounting
+        hybrid_local_path = Path(hybrid_local_path_env) if hybrid_local_path_env else None
 
         blobstore_dir   = Path(cls._get_env_value("BLOBSTORE_DIR", "./blobstore", env_vars)).resolve()
         artifacts_db    = Path(cls._get_env_value("ARTIFACTS_DB", "./artifacts.db", env_vars)).resolve()
