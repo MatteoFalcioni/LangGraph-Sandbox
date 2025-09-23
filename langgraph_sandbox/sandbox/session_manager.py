@@ -473,8 +473,14 @@ with open('/session/python_state.json', 'w') as f:
         if self.dataset_access == DatasetAccess.LOCAL_RO:
             volumes[str(self.datasets_path)] = {"bind": "/data", "mode": "ro"}
         elif self.dataset_access == DatasetAccess.HYBRID:
-            volumes[str(self.hybrid_local_path)] = {"bind": "/data", "mode": "rw"}
-        # NONE and API modes don't mount /data (API datasets are staged to /data)
+            volumes[str(self.hybrid_local_path)] = {"bind": "/heavy_data", "mode": "ro"}
+            # For HYBRID mode, we also need /data for API datasets
+            # Create a tmpfs for /data to allow API datasets to be written
+            tmpfs["/data"] = f"rw,size=1g,mode=1777"
+        elif self.dataset_access == DatasetAccess.API:
+            # API mode: create tmpfs for /data to allow API datasets to be written
+            tmpfs["/data"] = f"rw,size=1g,mode=1777"
+        # NONE mode doesn't mount /data (no datasets available)
 
         # Configure networking based on strategy
         if self.address_strategy == "container":
@@ -533,6 +539,14 @@ with open('/session/python_state.json', 'w') as f:
                 except Exception:
                     pass
                 time.sleep(0.1)
+        
+        # Create required directories in the container
+        try:
+            # Create /to_export and /modified_data directories with proper permissions
+            container.exec_run(["mkdir", "-p", "/to_export", "/modified_data"], user="root")
+            container.exec_run(["chmod", "777", "/to_export", "/modified_data"], user="root")
+        except Exception as e:
+            print(f"Warning: Could not create directories: {e}")
         
         # Write initial session metadata (BIND mode only)
         if self.session_storage == SessionStorage.BIND:
@@ -980,13 +994,6 @@ if session_artifacts.exists():
             }
         
         info = self.sessions[session_key]
-        
-        # Validate container path
-        if not container_path.startswith("/data/"):
-            return {
-                "success": False,
-                "error": "Path must be in /data/ directory"
-            }
         
         # Check if file exists in container
         try:

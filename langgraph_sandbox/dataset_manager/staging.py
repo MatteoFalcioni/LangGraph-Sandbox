@@ -38,6 +38,13 @@ def container_ro_path(cfg: Config, ds_id: str) -> str:
     return f"{cfg.container_data_ro}/{ds_id}.parquet"
 
 
+def container_hybrid_path(cfg: Config, ds_id: str) -> str:
+    """
+    Return the in-container path for a dataset in HYBRID mode (local datasets).
+    """
+    return f"/heavy_data/{ds_id}.parquet"
+
+
 def host_bind_data_path(cfg: Config, session_id: str, ds_id: str) -> Path:
     """
     Host-side path that the container sees at /session/data in BIND mode.
@@ -90,33 +97,17 @@ async def stage_dataset_into_sandbox(
     data = await fetch_fn(ds_id)
 
     if cfg.is_tmpfs:
-        # Write directly into container tmpfs using a simpler approach
-        # Ensure /data directory exists first
-        rc, _ = container.exec_run(["/bin/sh", "-lc", "mkdir -p /data"])
-        if rc != 0:
-            raise RuntimeError(f"Failed to create /data directory in container (rc={rc})")
-        
-        # Write file using base64 encoding to avoid tar issues
-        import base64
-        encoded_data = base64.b64encode(data).decode('ascii')
+        # Write directly into container using the efficient put_bytes function
         filename = f"{ds_id}.parquet"
-        
-        # Write the file using echo and base64 decode
-        cmd = f"echo '{encoded_data}' | base64 -d > /data/{filename}"
-        rc, out = container.exec_run(["/bin/sh", "-lc", cmd])
-        if rc != 0:
-            raise RuntimeError(f"Failed to write file {filename} to container (rc={rc}): {out}")
-        
-        # Verify the file was written
-        rc, out = container.exec_run(["/bin/sh", "-lc", f"ls -la /data/{filename}"])
-        if rc != 0:
-            raise RuntimeError(f"Failed to verify file {filename} was written")
+        container_path = f"/data/{filename}"
+        put_bytes(container, container_path, data)
     else:
         # BIND: write to host, appears in container
         dest = host_bind_data_path(cfg, session_id, ds_id)
         _atomic_write_bytes(dest, data)
 
-    return {
+    result = {
         "id": ds_id,
         "path_in_container": container_staged_path(cfg, ds_id),
     }
+    return result

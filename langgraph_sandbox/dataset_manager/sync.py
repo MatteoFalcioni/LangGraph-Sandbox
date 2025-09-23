@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 from ..config import Config
-from .staging import stage_dataset_into_sandbox, container_staged_path, container_ro_path
+from .staging import stage_dataset_into_sandbox, container_staged_path, container_ro_path, container_hybrid_path
 from .cache import DatasetStatus, update_entry_status
 
 async def load_pending_datasets(
@@ -45,7 +45,7 @@ async def load_pending_datasets(
                 
                 if local_file_path.exists():
                     # Dataset exists locally, use it (like LOCAL_RO mode)
-                    path = container_ro_path(cfg, ds_id) # it's mounted at start so just fetch path
+                    path = container_hybrid_path(cfg, ds_id) # it's mounted at /heavy_data so use hybrid path
                     desc = {
                         "id": ds_id,
                         "path_in_container": path,
