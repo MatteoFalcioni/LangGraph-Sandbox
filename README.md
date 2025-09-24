@@ -167,11 +167,7 @@ Configuration is managed through environment variables with sensible defaults:
 
 # --- Core knobs ---
 SESSION_STORAGE=TMPFS        # TMPFS | BIND
-<<<<<<< HEAD
-DATASET_ACCESS=API           # API | LOCAL_RO | NONE
-=======
 DATASET_ACCESS=API           # API | LOCAL_RO | NONE | HYBRID
->>>>>>> feat/sandbox-sync
 
 # --- Host paths ---
 SESSIONS_ROOT=./sessions
@@ -181,12 +177,9 @@ ARTIFACTS_DB=./artifacts.db
 # Required ONLY if DATASET_ACCESS=LOCAL_RO
 # DATASETS_HOST_RO=./example_llm_data
 
-<<<<<<< HEAD
-=======
 # Required ONLY if DATASET_ACCESS=HYBRID
 # HYBRID_LOCAL_PATH=./heavy_llm_data
 
->>>>>>> feat/sandbox-sync
 # --- Docker / runtime ---
 SANDBOX_IMAGE=sandbox:latest
 TMPFS_SIZE_MB=1024
@@ -225,25 +218,18 @@ In `sandbox.env`, set `SESSION_STORAGE=BIND`, `DATASET_ACCESS=LOCAL_RO` and `DAT
 langgraph-sandbox
 ```
 
-<<<<<<< HEAD
-**Production (default -> TMPFS+API):**
-=======
 **Hybrid mode (local + API datasets):**
 
 In `sandbox.env`, set `DATASET_ACCESS=HYBRID` and `HYBRID_LOCAL_PATH=./heavy_llm_data`, then:
->>>>>>> feat/sandbox-sync
 ```bash
 langgraph-sandbox
 ```
 
-<<<<<<< HEAD
-=======
 **Production (default -> TMPFS+API):**
 ```bash
 langgraph-sandbox
 ```
 
->>>>>>> feat/sandbox-sync
 **Docker Compose:**
 ```bash
 # Start container
@@ -310,28 +296,6 @@ If you encounter network issues, you can manually create the network:
 docker network create langgraph-network
 ```
 
-<<<<<<< HEAD
-#### Troubleshooting Container Strategy:
-
-If you encounter issues with container strategy:
-
-1. **Check if network exists:**
-   ```bash
-   docker network ls | grep langgraph-network
-   ```
-
-2. **Verify container is in correct network:**
-   ```bash
-   docker inspect sbox-{session_id} | grep -A 10 "Networks"
-   ```
-
-3. **Test connectivity from main app:**
-   ```bash
-   docker exec -it {main_app_container} curl http://sbox-{session_id}:9000/health
-   ```
-
-=======
->>>>>>> feat/sandbox-sync
 ### Docker Compose Example
 
 The project includes a `docker-compose.yml` file demonstrating both strategies:
@@ -508,55 +472,6 @@ python langgraph_sandbox/sandbox/session_viewer.py sessions/<session_id> --no-st
 - `SessionManager.exec(session_id, code)` - Execute code
 - `SessionManager.stop(session_id)` - Stop session
 
-<<<<<<< HEAD
-## Troubleshooting
-
-### Common Issues
-
-**Import errors (`ModuleNotFoundError`):**
-- Ensure you have Python >= 3.11: `python --version`
-- Install in the correct environment: `pip install -e .`
-- If using conda, activate the correct environment first
-- For usage examples, run from project root: `langgraph-sandbox`
-
-**Container startup failures:**
-- Ensure Docker is running
-- Check `SANDBOX_IMAGE` points to correct image
-- Verify sufficient disk space
-
-**Dataset access problems:**
-- For `LOCAL_RO`: Ensure `DATASETS_HOST_RO` path exists
-- For `API`: Check network connectivity and API configuration
-- Verify dataset files are in Parquet format
-
-**Artifact download failures:**
-- Check artifact server is running (port 8000)
-- Verify token hasn't expired
-- Ensure artifact ID is correct
-
-**Usage example failures:**
-- Examples must be run from the project root directory
-- Use `langgraph-sandbox` command
-- Do not run examples directly from their subdirectories
-
-**Docker build failures:**
-- Ensure you've run the setup process: `python -m langgraph_sandbox.setup`
-- The Dockerfile expects `sandbox/repl_server.py` to exist in the build context
-- If you get "COPY sandbox/repl_server.py: not found", run the setup command above
-
-**Session Manager hanging/timeout issues:**
-- This is expected when running SessionManager directly from the host machine
-- The SessionManager is designed to run inside the Docker Compose environment
-- For testing, use the full CLI workflow: `langgraph-sandbox`
-- Container strategy requires proper network configuration (already set up in docker-compose.yml)
-
-**Network connectivity issues:**
-- Ensure Docker Compose is running: `docker compose up -d`
-- Check containers are in the correct network: `docker network inspect langgraph-network`
-- Verify container names follow the pattern: `sbox-{session_id}`
-
-=======
->>>>>>> feat/sandbox-sync
 ## Next Steps
 
 - **Quotas**: Add per-session size limits and retention policies
