@@ -1,5 +1,10 @@
 # LangGraph Sandbox – Docker-Based Code Execution Environment
 
+<p align="center">
+  <img src="images/img.png" width="250">
+</p>
+
+
 A production-ready Docker sandbox for executing Python code within LangGraph agentic systems. Provides secure, isolated code execution with persistent state, dataset management, and automatic artifact storage.
 
 ## Table of Contents
@@ -72,6 +77,19 @@ pip install -r requirements.txt
 # Set up the sandbox environment (copies required files)
 python sandbox-setup
 
+```
+you should see: 
+```bash
+Setting up LangGraph Sandbox...
+✓ Copied Dockerfile.sandbox
+✓ Copied docker-compose.yml
+✓ Copied docker-compose.override.yml
+✓ Copied sandbox.env.example
+✓ Copied sandbox/ directory
+#...
+```
+then:
+```
 # Set up configuration
 cp sandbox.env.example sandbox.env
 # Edit sandbox.env and add your OPENAI_API_KEY
