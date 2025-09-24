@@ -94,36 +94,13 @@ async def stage_dataset_into_sandbox(
         raise ValueError("stage_dataset_into_sandbox should only be called in API or HYBRID mode")
 
     # Fetch the dataset bytes
-    print(f"Fetching dataset {ds_id}...")
     data = await fetch_fn(ds_id)
-    print(f"Dataset {ds_id} fetched, size: {len(data)} bytes")
 
     if cfg.is_tmpfs:
-<<<<<<< HEAD
-        # Use TAR method instead of base64/echo to avoid argument list too long
-        filename = f"{ds_id}.parquet"
-        container_path = f"/session/data/{filename}"
-        print(f"Writing {filename} to container using TAR method...")
-        
-        # Ensure /session/data directory exists
-        rc, out = container.exec_run(["/bin/sh", "-lc", "mkdir -p /session/data"])
-        if rc != 0:
-            raise RuntimeError(f"Failed to create /session/data directory in container (rc={rc}, output={out})")
-        
-        # Use the TAR method from io.py - this avoids the argument list too long error
-        put_bytes(container, container_path, data)
-        print(f"Successfully wrote {filename} to container using TAR method")
-        
-        # Verify the file was written
-        rc, out = container.exec_run(["/bin/sh", "-lc", f"ls -la /session/data/{filename}"])
-        if rc != 0:
-            raise RuntimeError(f"Failed to verify file {filename} was written")
-=======
         # Write directly into container using the efficient put_bytes function
         filename = f"{ds_id}.parquet"
         container_path = f"/data/{filename}"
         put_bytes(container, container_path, data)
->>>>>>> feat/sandbox-sync
     else:
         # BIND: write to host, appears in container
         dest = host_bind_data_path(cfg, session_id, ds_id)
@@ -132,9 +109,5 @@ async def stage_dataset_into_sandbox(
     result = {
         "id": ds_id,
         "path_in_container": container_staged_path(cfg, ds_id),
-<<<<<<< HEAD
-    }
-=======
     }
     return result
->>>>>>> feat/sandbox-sync

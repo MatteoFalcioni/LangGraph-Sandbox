@@ -24,12 +24,10 @@ try:
     # Try relative imports first (when used as a module)
     from ..artifacts.ingest import ingest_files
     from .container_utils import cleanup_sandbox_containers
-    from .io import file_exists_in_container
 except ImportError:
     # Fall back to absolute imports (when run directly)
     from artifacts.ingest import ingest_files
     from sandbox.container_utils import cleanup_sandbox_containers
-    from sandbox.io import file_exists_in_container
 
 from enum import Enum
 
@@ -507,10 +505,6 @@ with open('/session/python_state.json', 'w') as f:
             # If there's any issue removing the existing container, log it but continue
             print(f"Warning: Could not remove existing container {name}: {e}")
 
-<<<<<<< HEAD
-        
-=======
->>>>>>> feat/sandbox-sync
         # Run container
         container = self.client.containers.run(
             self.image,
@@ -545,8 +539,6 @@ with open('/session/python_state.json', 'w') as f:
                 except Exception:
                     pass
                 time.sleep(0.1)
-<<<<<<< HEAD
-=======
         
         # Create required directories in the container
         try:
@@ -555,7 +547,6 @@ with open('/session/python_state.json', 'w') as f:
             container.exec_run(["chmod", "777", "/to_export", "/modified_data", "/session/artifacts"], user="root")
         except Exception as e:
             print(f"Warning: Could not create directories: {e}")
->>>>>>> feat/sandbox-sync
         
         # Write initial session metadata (BIND mode only)
         if self.session_storage == SessionStorage.BIND:
@@ -698,13 +689,9 @@ with open('/session/python_state.json', 'w') as f:
                     fdst.write(fsrc.read())
             return out_path
 
-        # Check if file exists first using exec_run instead of get_archive
-        if not file_exists_in_container(container, container_path):
-            raise RuntimeError(f"File {container_path} does not exist in container")
-
         # a few quick retries to smooth out FS propagation on tmpfs
         for attempt in range(5):
-            # 1) direct get_archive(file) - only if file exists
+            # 1) direct get_archive(file)
             try:
                 bits, _ = container.get_archive(container_path)
                 data = b"".join(bits)
@@ -715,9 +702,6 @@ with open('/session/python_state.json', 'w') as f:
                 if attempt == 4:
                     raise
 
-<<<<<<< HEAD
-            # 2) exec tar in the container and read from stdout (safer than get_archive on parent)
-=======
             # 2) get_archive(parent) and extract filename
             try:
                 bits, _ = container.get_archive(parent)
@@ -730,7 +714,6 @@ with open('/session/python_state.json', 'w') as f:
                     raise
 
             # 3) exec tar in the container and read from stdout
->>>>>>> feat/sandbox-sync
             try:
                 rc, out = container.exec_run(
                     ["bash", "-lc", f"set -euo pipefail; cd {parent} && tar -cf - {filename}"],

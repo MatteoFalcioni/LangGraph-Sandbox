@@ -6,12 +6,9 @@ services:
       dockerfile: Dockerfile.sandbox
     container_name: langgraph-sandbox
     environment:
-<<<<<<< HEAD
-=======
       # **IMPORTANT**: when using compose, you MUST specify env arguments here
       # since the env file is created from the example when the compose runs.
 
->>>>>>> feat/sandbox-sync
       # Network configuration for sandbox
       SANDBOX_ADDRESS_STRATEGY: container
       COMPOSE_NETWORK: langgraph-network
