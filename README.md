@@ -14,7 +14,6 @@ A production-ready Docker sandbox for executing Python code within LangGraph age
 - [Session Management](#session-management)
 - [Development & Debugging](#development--debugging)
 - [API Reference](#api-reference)
-- [Troubleshooting](#troubleshooting)
 
 ## Overview
 
