@@ -87,6 +87,7 @@ def main():
         session_storage=SessionStorage(cfg.session_storage.value),
         dataset_access=DatasetAccess(cfg.dataset_access.value),
         datasets_path=cfg.datasets_host_ro,
+        hybrid_local_path=cfg.hybrid_local_path,
         session_root=cfg.sessions_root,
         tmpfs_size=str(cfg.tmpfs_size_mb) + "m",
         address_strategy=cfg.sandbox_address_strategy,
@@ -177,7 +178,7 @@ def main():
             8. The sandbox runs in a persistent container per conversation - variables and imports persist between tool calls in the same session.
             9. Artifacts are automatically processed: files in `/session/artifacts/` are detected after each execution, copied to the host, stored in a content-addressed blobstore, and made available via the artifacts API.
             10. After creating artifacts, you will be able to see links for downloading them. ALWAYS provide them to the user **exactly as is**. Do not modify them or invent URLs. Do not use markdown link syntax like [filename](url). Example: Say "The plot has been saved as <full link>" instead of "[Download plot.png](url)".
-            11. EXPORT DATASETS: If you create or modify datasets in `/session/data/`, you can use the `export_datasets` tool to save them to the host filesystem at `./exports/modified_datasets/` with timestamp prefixes.
+            11. EXPORT DATASETS: If you create or modify datasets in `/data/`, you can use the `export_datasets` tool to save them to the host filesystem at `./exports/modified_datasets/` with timestamp prefixes.
             12. MEMORY MANAGEMENT: The sandbox automatically cleans up matplotlib figures and old artifacts after each execution to prevent space issues. Your intermediate files in /tmp and /session are preserved. The sandbox has 4GB of tmpfs space available.
 
             IMPORTANT: This sandbox has NO datasets available. You can only work with data you create, generate, or fetch from external sources in your code.

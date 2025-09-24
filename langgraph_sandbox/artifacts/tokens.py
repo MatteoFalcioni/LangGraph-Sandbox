@@ -12,6 +12,7 @@ def _b64u_dec(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + pad)
 
 def _secret() -> bytes:
+<<<<<<< HEAD
     """Get the secret key for token signing. Uses ARTIFACTS_SECRET env var or generates one."""
     secret = os.getenv("ARTIFACTS_SECRET")
     if secret:
@@ -19,6 +20,16 @@ def _secret() -> bytes:
     else:
         # Fallback to random secret if no env var set
         return secrets.token_urlsafe(32).encode("utf-8")
+=======
+    """Get the secret key for token signing. Uses ARTIFACTS_SECRET env var if set, otherwise generates a random one."""
+    # Try to use the fixed secret from environment first
+    env_secret = os.getenv("ARTIFACTS_SECRET")
+    if env_secret:
+        return env_secret.encode("utf-8")
+    
+    # Fall back to generating a random secret
+    return secrets.token_urlsafe(32).encode("utf-8")
+>>>>>>> feat/sandbox-sync
 
 def _ttl() -> int:
     try:

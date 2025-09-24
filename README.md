@@ -38,7 +38,7 @@ This sandbox replaces services like E2B by running isolated Docker containers fo
 
 ## Execution Modes
 
-The system offers six execution modes based on two independent configuration knobs:
+The system offers eight execution modes based on two independent configuration knobs:
 
 | Mode | Session Storage | Dataset Access | Description | Best For |
 |------|----------------|----------------|-------------|----------|
@@ -48,12 +48,15 @@ The system offers six execution modes based on two independent configuration kno
 | **BIND_LOCAL** | Disk (BIND) | Local RO | Persistent + host datasets | Full development with datasets |
 | **TMPFS_API** | RAM (TMPFS) | API | Memory + API datasets | Multi-tenant, cloud datasets |
 | **BIND_API** | Disk (BIND) | API | Persistent + API datasets | Development with API datasets |
+| **TMPFS_HYBRID** | RAM (TMPFS) | Hybrid | Memory + local + API datasets | Best of both worlds |
+| **BIND_HYBRID** | Disk (BIND) | Hybrid | Persistent + local + API datasets | Full development with mixed datasets |
 
 ### Recommended Defaults
 
 - **Simple coding**: `TMPFS_NONE` - Perfect for general-purpose coding without datasets
 - **Production demos**: `TMPFS_API` - Multi-tenant with dynamic dataset loading
 - **Local development**: `BIND_LOCAL` - Full debugging with local datasets
+- **Mixed datasets**: `TMPFS_HYBRID` - Local datasets + API fetching for maximum flexibility
 
 ## Quick Start
 
@@ -164,7 +167,11 @@ Configuration is managed through environment variables with sensible defaults:
 
 # --- Core knobs ---
 SESSION_STORAGE=TMPFS        # TMPFS | BIND
+<<<<<<< HEAD
 DATASET_ACCESS=API           # API | LOCAL_RO | NONE
+=======
+DATASET_ACCESS=API           # API | LOCAL_RO | NONE | HYBRID
+>>>>>>> feat/sandbox-sync
 
 # --- Host paths ---
 SESSIONS_ROOT=./sessions
@@ -174,6 +181,12 @@ ARTIFACTS_DB=./artifacts.db
 # Required ONLY if DATASET_ACCESS=LOCAL_RO
 # DATASETS_HOST_RO=./example_llm_data
 
+<<<<<<< HEAD
+=======
+# Required ONLY if DATASET_ACCESS=HYBRID
+# HYBRID_LOCAL_PATH=./heavy_llm_data
+
+>>>>>>> feat/sandbox-sync
 # --- Docker / runtime ---
 SANDBOX_IMAGE=sandbox:latest
 TMPFS_SIZE_MB=1024
@@ -212,11 +225,25 @@ In `sandbox.env`, set `SESSION_STORAGE=BIND`, `DATASET_ACCESS=LOCAL_RO` and `DAT
 langgraph-sandbox
 ```
 
+<<<<<<< HEAD
+**Production (default -> TMPFS+API):**
+=======
+**Hybrid mode (local + API datasets):**
+
+In `sandbox.env`, set `DATASET_ACCESS=HYBRID` and `HYBRID_LOCAL_PATH=./heavy_llm_data`, then:
+>>>>>>> feat/sandbox-sync
+```bash
+langgraph-sandbox
+```
+
+<<<<<<< HEAD
+=======
 **Production (default -> TMPFS+API):**
 ```bash
 langgraph-sandbox
 ```
 
+>>>>>>> feat/sandbox-sync
 **Docker Compose:**
 ```bash
 # Start container
@@ -283,6 +310,7 @@ If you encounter network issues, you can manually create the network:
 docker network create langgraph-network
 ```
 
+<<<<<<< HEAD
 #### Troubleshooting Container Strategy:
 
 If you encounter issues with container strategy:
@@ -302,6 +330,8 @@ If you encounter issues with container strategy:
    docker exec -it {main_app_container} curl http://sbox-{session_id}:9000/health
    ```
 
+=======
+>>>>>>> feat/sandbox-sync
 ### Docker Compose Example
 
 The project includes a `docker-compose.yml` file demonstrating both strategies:
@@ -356,7 +386,7 @@ The system provides **production-ready LangGraph tools** out of the box through 
 - Memory cleanup to prevent container bloat
 - Session-pinned containers for consistency
 
-**`make_select_dataset_tool`** - Load datasets on-demand (**only in API mode**)
+**`make_select_dataset_tool`** - Load datasets on-demand (**API and HYBRID modes**)
 - Fetches datasets from your API sources
 - Stages them directly into the sandbox
 - Smart caching with PENDING/LOADED/FAILED status tracking
@@ -365,19 +395,14 @@ The system provides **production-ready LangGraph tools** out of the box through 
 **`make_export_datasets_tool`** - Export modified datasets to host filesystem
 - Timestamped exports to prevent overwrites
 - Automatic artifact ingestion for download URLs
-- Works with any file in `/session/data/`
+- Works with any file in `/data/`
 
 **`make_list_datasets_tool`** - List available datasets in the sandbox
-- **API mode**: Lists datasets loaded in `/session/data` (dynamically loaded datasets)
+- **API mode**: Lists datasets loaded in `/data` (dynamically loaded datasets)
 - **LOCAL_RO mode**: Lists statically mounted files in `/data` (host-mounted datasets)
+- **HYBRID mode**: Lists both local mounted files and API-loaded datasets in `/data`
 - **NONE mode**: Returns message indicating no datasets are available
 - Provides detailed file information including size, modification time, and paths
-
-Instead of writing custom tool implementations, you get:
-- **Zero boilerplate**: Just call the factory with your dependencies
-- **Battle-tested**: Handles edge cases, timeouts, and error recovery
-- **Consistent**: Same patterns across all your LangGraph applications
-- **Extensible**: Easy to customize with your own fetch functions and clients
 
 ```python
 # Example: Create tools in 4 lines
@@ -413,13 +438,6 @@ Files saved to `/session/artifacts/` are automatically processed:
 - **Metadata tracking**: Size, MIME type, creation time, session links
 - **Content addressing**: SHA-256 based blob storage
 - **API access**: REST endpoints for artifact management
-
-### Security
-
-- ✅ **Auto-generated secrets**: Secure token signing keys
-- ✅ **Short-lived tokens**: Default 10-minute expiration
-- ✅ **No manual configuration**: Works out of the box
-- ✅ **Content verification**: SHA-256 integrity checking
 
 ## Session Management
 
@@ -490,6 +508,7 @@ python langgraph_sandbox/sandbox/session_viewer.py sessions/<session_id> --no-st
 - `SessionManager.exec(session_id, code)` - Execute code
 - `SessionManager.stop(session_id)` - Stop session
 
+<<<<<<< HEAD
 ## Troubleshooting
 
 ### Common Issues
@@ -536,6 +555,8 @@ python langgraph_sandbox/sandbox/session_viewer.py sessions/<session_id> --no-st
 - Check containers are in the correct network: `docker network inspect langgraph-network`
 - Verify container names follow the pattern: `sbox-{session_id}`
 
+=======
+>>>>>>> feat/sandbox-sync
 ## Next Steps
 
 - **Quotas**: Add per-session size limits and retention policies

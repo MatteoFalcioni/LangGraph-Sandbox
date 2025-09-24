@@ -38,6 +38,13 @@ def container_ro_path(cfg: Config, ds_id: str) -> str:
     return f"{cfg.container_data_ro}/{ds_id}.parquet"
 
 
+def container_hybrid_path(cfg: Config, ds_id: str) -> str:
+    """
+    Return the in-container path for a dataset in HYBRID mode (local datasets).
+    """
+    return f"/heavy_data/{ds_id}.parquet"
+
+
 def host_bind_data_path(cfg: Config, session_id: str, ds_id: str) -> Path:
     """
     Host-side path that the container sees at /session/data in BIND mode.
@@ -84,7 +91,7 @@ async def stage_dataset_into_sandbox(
     Any exceptions raised by fetch_fn or I/O operations will propagate.
     """
     if not cfg.uses_api_staging:
-        raise ValueError("stage_dataset_into_sandbox should only be called in API mode")
+        raise ValueError("stage_dataset_into_sandbox should only be called in API or HYBRID mode")
 
     # Fetch the dataset bytes
     print(f"Fetching dataset {ds_id}...")
@@ -92,6 +99,7 @@ async def stage_dataset_into_sandbox(
     print(f"Dataset {ds_id} fetched, size: {len(data)} bytes")
 
     if cfg.is_tmpfs:
+<<<<<<< HEAD
         # Use TAR method instead of base64/echo to avoid argument list too long
         filename = f"{ds_id}.parquet"
         container_path = f"/session/data/{filename}"
@@ -110,12 +118,23 @@ async def stage_dataset_into_sandbox(
         rc, out = container.exec_run(["/bin/sh", "-lc", f"ls -la /session/data/{filename}"])
         if rc != 0:
             raise RuntimeError(f"Failed to verify file {filename} was written")
+=======
+        # Write directly into container using the efficient put_bytes function
+        filename = f"{ds_id}.parquet"
+        container_path = f"/data/{filename}"
+        put_bytes(container, container_path, data)
+>>>>>>> feat/sandbox-sync
     else:
         # BIND: write to host, appears in container
         dest = host_bind_data_path(cfg, session_id, ds_id)
         _atomic_write_bytes(dest, data)
 
-    return {
+    result = {
         "id": ds_id,
         "path_in_container": container_staged_path(cfg, ds_id),
+<<<<<<< HEAD
     }
+=======
+    }
+    return result
+>>>>>>> feat/sandbox-sync
