@@ -215,6 +215,7 @@ HOST_GATEWAY=host.docker.internal  # Gateway hostname for host strategy (auto-de
 # OPENAI_API_KEY=your_openai_api_key_here
 
 # --- Artifacts service (optional) ---
+# ARTIFACTS_SECRET=fixed_artifact_secret           # use this if you want to standardize keys, (otherwise generated randomly)
 # ARTIFACTS_PUBLIC_BASE_URL=http://localhost:8000  # default: http://localhost:8000
 # ARTIFACTS_TOKEN_TTL_SECONDS=600                  # default: 600 seconds
 ```
