@@ -1,7 +1,7 @@
 # LangGraph Sandbox – Docker-Based Code Execution Environment
 
 <p align="center">
-  <img src="images/img.png" width="250">
+  <img src="images/img.png" width="450">
 </p>
 
 
