@@ -1,9 +1,9 @@
-from src.tool_factory.make_tools import make_code_sandbox_tool, make_export_datasets_tool
-from src.config import Config
+from langgraph_sandbox.tool_factory.make_tools import make_code_sandbox_tool, make_export_datasets_tool
+from langgraph_sandbox.config import Config
 from pathlib import Path
-from src.artifacts.tokens import create_download_url
-from src.artifacts.reader import get_metadata
-from src.sandbox.session_manager import SessionManager
+from langgraph_sandbox.artifacts.tokens import create_download_url
+from langgraph_sandbox.artifacts.reader import get_metadata
+from langgraph_sandbox.sandbox.session_manager import SessionManager
 from typing import List, Dict
 import re
 
@@ -27,7 +27,7 @@ def set_session_id(session_id: str):
 
 # Artifact fetching is now handled by the general artifact system
 # Import the function from the general location
-from src.artifacts.reader import fetch_artifact_urls
+from langgraph_sandbox.artifacts.reader import fetch_artifact_urls
 
 def extract_artifact_references(text: str) -> List[str]:
     """

@@ -16,14 +16,14 @@ from dotenv import load_dotenv
 import uuid
 
 from fastapi import FastAPI
-from src.artifacts.store import ensure_artifact_store
-from src.artifacts.api import router as artifacts_router
+from langgraph_sandbox.artifacts.store import ensure_artifact_store
+from langgraph_sandbox.artifacts.api import router as artifacts_router
 
-from src.config import Config
+from langgraph_sandbox.config import Config
 from ex2_graph.simple_ex_graph import get_builder
 from ex2_graph.tools import set_session_id
-from src.sandbox.container_utils import cleanup_sandbox_containers
-from src.artifacts.reader import fetch_artifact_urls
+from langgraph_sandbox.sandbox.container_utils import cleanup_sandbox_containers
+from langgraph_sandbox.artifacts.reader import fetch_artifact_urls
 
 def main():
     app = FastAPI()
