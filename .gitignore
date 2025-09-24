@@ -19,3 +19,4 @@ build/
 dist/
 .eggs/
 heavy_llm_data/
+langgraph_sandbox.egg-info/
