@@ -182,6 +182,10 @@ def make_select_dataset_tool(
         # Load configuration
         cfg = Config.from_env()
         session_id = session_key_fn()
+
+        # safety check: clean dataset id of any extension (like .parquet, .csv, etc.)
+        # if mistakenly set by llm
+        dataset_id = dataset_id.split(".")[0]
         
         # Add the dataset to cache with PENDING status
         cache_path = add_entry(cfg, session_id, dataset_id, status=DatasetStatus.PENDING)
@@ -263,13 +267,13 @@ def make_export_datasets_tool(
     session_key_fn: Callable[[], str] = _default_get_session_key,
     name: str = "export_datasets",
     description: str = (
-        "Export a modified dataset from /to_export/ to ./exports/modified_datasets/ "
+        "Export a modified dataset from the container filepath to ./exports/modified_datasets/ "
         "with timestamp prefix. Use this to save processed or modified datasets "
         "from the sandbox to the host filesystem."
     ),
 ) -> Callable:
     """
-    Create a tool for exporting files from the container's /data/ directory.
+    Create a tool for exporting files from the container's filepath.
     
     Parameters:
         session_manager: SessionManager instance to use for container operations
