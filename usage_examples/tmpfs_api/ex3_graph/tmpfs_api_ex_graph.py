@@ -10,7 +10,7 @@ from ex3_graph.prompt import PROMPT
 
 load_dotenv("tmpfs_api.env")
 
-llm = ChatOpenAI(model="gpt-4")
+llm = ChatOpenAI(model="gpt-4.1")
 
 coding_agent = create_react_agent(
     model=llm,

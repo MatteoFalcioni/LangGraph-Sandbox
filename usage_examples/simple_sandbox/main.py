@@ -16,17 +16,24 @@ from dotenv import load_dotenv
 import uuid
 
 from fastapi import FastAPI
-from langgraph_sandbox.artifacts.store import ensure_artifact_store
-from langgraph_sandbox.artifacts.api import router as artifacts_router
+from src.artifacts.store import ensure_artifact_store
+from src.artifacts.api import router as artifacts_router
 
-from langgraph_sandbox.config import Config
+from src.config import Config
 from ex2_graph.simple_ex_graph import get_builder
 from ex2_graph.tools import set_session_id
-from langgraph_sandbox.sandbox.container_utils import cleanup_sandbox_containers
+from src.sandbox.container_utils import cleanup_sandbox_containers
+from src.artifacts.reader import fetch_artifact_urls
 
 def main():
     app = FastAPI()
 
+    env = load_dotenv("simple_sandbox.env")
+    if env == True: 
+        print("Loaded .env file")
+    else:
+        print("No .env file found")
+    
     ensure_artifact_store() # bootstrap storage using environment variables
 
     cfg = Config.from_env(env_file_path=Path("simple_sandbox.env"))
@@ -48,36 +55,16 @@ def main():
     import threading
     import time
     
-    server_port = [None]  # Use a list to make it mutable
-    
     def run_server():
-        ports_to_try = [8000, 8001, 8002, 8003, 8004]
-        for port in ports_to_try:
-            try:
-                server_port[0] = port
-                uvicorn.run(app, host="0.0.0.0", port=port, log_level="error")
-                break  # Success, exit the loop
-            except OSError as e:
-                if "address already in use" in str(e).lower():
-                    if port == ports_to_try[0]:  # Only show warning for first attempt
-                        print(f"⚠️  Port {port} is already in use (likely by Docker Compose), trying alternative port...")
-                    continue  # Try next port
-                else:
-                    print(f"Server error: {e}")
-                    break
-            except Exception as e:
-                print(f"Server error: {e}")
-                break
+        try:
+            uvicorn.run(app, host="0.0.0.0", port=8000, log_level="error")
+        except Exception as e:
+            print(f"Server error: {e}")
     
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
     time.sleep(2)  # Give the server time to start
-    
-    # Report the actual port used
-    if server_port[0]:
-        print(f"Artifact server started on http://localhost:{server_port[0]}")
-    else:
-        print("Artifact server started")
+    print("Artifact server started on http://localhost:8000")
 
     builder = get_builder()
 
