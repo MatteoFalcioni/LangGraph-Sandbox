@@ -1,6 +1,0 @@
-artifacts
-datasets
-llm_data
-sandbox
-setup
-tool_factory
