@@ -70,11 +70,8 @@ def put_bytes(container, container_path: str, data: bytes, *, mode: int = 0o644)
         ["python3", "-c", f"import os; os.makedirs('/{parent}', exist_ok=True)"]
     )
 
-    if rc != 0:
-        raise RuntimeError(f"Failed to create directory '/{parent}' in container (rc={rc})")
 
     # Try put_archive first, but fallback to direct write if it fails
-    # Always failes btw... maybe could remove it entirely adn go with bytes
     try:
         ok = container.put_archive(path="/data", data=tar_bytes)
         
@@ -89,6 +86,36 @@ def put_bytes(container, container_path: str, data: bytes, *, mode: int = 0o644)
     except Exception as e:
         print(f"put_archive exception: {e}, trying direct write...")
     
+    # Fallback to base64 method
+    _write_small_file_base64(container, container_path, data)
+
+
+def _write_small_file_base64(container, container_path: str, data: bytes) -> None:
+    """Write small files using base64 method."""
+    import base64
+    b64_data = base64.b64encode(data).decode('ascii')
+    
+    python_code = f"""
+import base64
+import os
+
+data = '{b64_data}'
+file_path = '{container_path}'
+
+# Ensure parent directory exists
+os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+# Write the file
+with open(file_path, 'wb') as f:
+    f.write(base64.b64decode(data))
+
+print(f"Successfully wrote {{file_path}}")
+"""
+    
+    rc, out = container.exec_run(["/bin/sh", "-lc", f"python3 -c {shlex.quote(python_code)}"])
+    if rc != 0:
+        raise RuntimeError(f"Failed to write file using base64 method (rc={rc}, output={out})")
+
     import base64
     data_b64 = base64.b64encode(data).decode('ascii')
     
