@@ -1,17 +1,28 @@
 # langgraph_sandbox/artifacts/ingest.py
 """
-Ingest new artifact files from a session's staging folder (/session/artifacts inside the container).
-Host-side: we receive HOST paths of new files, move their bytes into a content-addressed blobstore,
-insert metadata in SQLite, delete the originals from the session folder, and return descriptors.
+Artifact Ingestion System
 
-Steps:
-- We compute a SHA-256 fingerprint of each file (its "digital fingerprint").
-- We save the file once under blobstore/<2-char>/<2-char>/<sha256>.
-- We record a row in 'artifacts' (if that sha is new) and a row in 'links' (always).
-- We remove the original file from the session folder.
-- We return a small "descriptor" for each artifact (id, name, mime, size, sha, created_at).
+This module handles the process of taking files from the sandbox staging area and
+properly storing them in the artifact system. It's the bridge between temporary
+files created by agents and the permanent artifact storage.
 
-Env knobs (optional):
+The ingestion process:
+1. Takes files from staging folder (/session/artifacts inside the container)
+2. Computes SHA-256 fingerprint for deduplication
+3. Stores files in content-addressed blobstore (blobstore/ab/cd/abcdef...)
+4. Records metadata in SQLite database
+5. Creates links between artifacts and sessions/runs
+6. Cleans up original files from staging area
+7. Returns artifact descriptors with download URLs
+
+Key features:
+- Content deduplication (same file content = same storage)
+- Session tracking (which artifacts belong to which conversation)
+- Size limits (prevents huge files from consuming storage)
+- Atomic operations (all-or-nothing for each file)
+- Cleanup (removes staging files after successful ingestion)
+
+Environment variables (optional):
 - ARTIFACTS_DB_PATH: path to SQLite db (default: <project>/artifacts.db)
 - BLOBSTORE_DIR: blob folder (default: <project>/blobstore)
 - MAX_ARTIFACT_SIZE_MB: per-file size cap (default: 50 MB)
@@ -34,13 +45,41 @@ from .tokens import create_download_url
 # ---------- small helpers ----------
 
 def _now_iso() -> str:
+    """
+    Get current timestamp in ISO format.
+    
+    Returns:
+        ISO 8601 formatted timestamp string (e.g., "2024-01-01T12:00:00+00:00")
+    """
     return datetime.now(timezone.utc).isoformat()
 
 def _gen_artifact_id() -> str:
+    """
+    Generate a unique, human-readable artifact ID.
+    
+    Format: "art_" + 24 hex characters from UUID
+    Example: "art_abc123def456789012345678"
+    
+    Returns:
+        Unique artifact identifier string
+    """
     # short, unique, human-ish
     return "art_" + uuid.uuid4().hex[:24]
 
 def _file_sha256(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    """
+    Compute SHA-256 hash of a file for content fingerprinting.
+    
+    Reads the file in chunks to handle large files efficiently without
+    loading the entire file into memory at once.
+    
+    Args:
+        path: Path to the file to hash
+        chunk_size: Size of each chunk to read (default: 1MB)
+    
+    Returns:
+        SHA-256 hash as hexadecimal string
+    """
     h = hashlib.sha256()
     with path.open("rb") as f:
         for chunk in iter(lambda: f.read(chunk_size), b""):
@@ -48,18 +87,65 @@ def _file_sha256(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return h.hexdigest()
 
 def _blob_path_for_sha(blob_dir: Path, sha256: str) -> Path:
+    """
+    Convert SHA-256 hash to blob storage path.
+    
+    Uses a two-level directory structure to avoid too many files in one directory:
+    - First 2 characters: top-level directory
+    - Next 2 characters: second-level directory
+    - Full hash: filename
+    
+    Example: sha256="abc123..." → "blobstore/ab/c1/abc123..."
+    
+    Args:
+        blob_dir: Base directory for blob storage
+        sha256: SHA-256 hash of the file content
+    
+    Returns:
+        Path object pointing to the blob storage location
+    """
     # e.g., blobstore/ab/cd/abcdef...
     a, b = sha256[:2], sha256[2:4]
     return blob_dir / a / b / sha256
 
 def _ensure_parent(p: Path) -> None:
+    """
+    Ensure the parent directory of a path exists.
+    
+    Creates all necessary parent directories if they don't exist.
+    Equivalent to `mkdir -p` in Unix.
+    
+    Args:
+        p: Path whose parent directory should exist
+    """
     p.parent.mkdir(parents=True, exist_ok=True)
 
 def _sniff_mime(path: Path) -> str:
+    """
+    Detect MIME type of a file based on its extension.
+    
+    Uses Python's mimetypes module to guess the MIME type.
+    Falls back to "application/octet-stream" for unknown types.
+    
+    Args:
+        path: Path to the file
+    
+    Returns:
+        MIME type string (e.g., "image/png", "text/csv", "application/octet-stream")
+    """
     mt, _ = mimetypes.guess_type(path.name)
     return mt or "application/octet-stream"
 
 def _max_bytes() -> int:
+    """
+    Get maximum file size limit in bytes.
+    
+    Reads from MAX_ARTIFACT_SIZE_MB environment variable.
+    Defaults to 50 MB if not set.
+    
+    Returns:
+        Maximum file size in bytes
+    """
     # default 50 MB
     mb = int(os.getenv("MAX_ARTIFACT_SIZE_MB", "50"))
     return mb * 1024 * 1024
@@ -75,22 +161,37 @@ def ingest_files(
     tool_call_id: Optional[str] = None,
 ) -> List[Dict]:
     """
+    Ingest files from staging area into the artifact system.
+    
+    This is the main entry point for artifact ingestion. It takes files from the
+    sandbox staging area and properly stores them in the artifact system with
+    deduplication, metadata tracking, and cleanup.
+    
+    The process for each file:
+    1. Check file size (skip if too large)
+    2. Compute SHA-256 hash for deduplication
+    3. Store file in content-addressed blobstore
+    4. Record metadata in database
+    5. Create link between artifact and session
+    6. Clean up original staging file
+    7. Return artifact descriptor
+    
     Args:
-      new_host_files: list of new files detected under the session's staging folder (HOST paths).
-      session_id: your per-session identifier.
-      run_id: your per-tool-call identifier.
-      tool_call_id: optional extra tag.
-
+        new_host_files: List of file paths from the staging area (HOST paths)
+        session_id: Unique identifier for the conversation/session
+        run_id: Optional identifier for the specific LangGraph run
+        tool_call_id: Optional identifier for the specific tool call
+    
     Returns:
-      List of artifact descriptors:
-      {
-        "id": str,
-        "name": str,
-        "mime": str,
-        "size": int,
-        "sha256": str,
-        "created_at": str
-      }
+        List of artifact descriptors, each containing:
+        - id: Artifact ID (None if file was too large)
+        - name: Original filename
+        - mime: MIME type
+        - size: File size in bytes
+        - sha256: Content hash (None if file was too large)
+        - created_at: ISO timestamp
+        - url: Download URL (if environment is configured)
+        - error: Error message (if file was too large)
     """
     paths = _resolve_paths()
     blob_dir = paths["blob_dir"]
@@ -99,7 +200,7 @@ def ingest_files(
     descriptors: List[Dict] = []
     max_bytes = _max_bytes()
 
-    # Normalize to Path
+    # Normalize to Path objects and filter out non-files
     new_paths = [Path(p) for p in new_host_files if p and Path(p).is_file()]
 
     with _connect(db_path) as conn:
@@ -119,14 +220,16 @@ def ingest_files(
                 })
                 continue
 
+            # Compute content hash for deduplication
             sha = _file_sha256(src)
             mime = _sniff_mime(src)
             created_at = _now_iso()
 
+            # Determine blob storage path
             blob_path = _blob_path_for_sha(blob_dir, sha)
             _ensure_parent(blob_path)
 
-            # INSERT or SELECT existing artifact id by sha
+            # INSERT or SELECT existing artifact id by sha (handles deduplication)
             artifact_id = _upsert_artifact(conn, sha, size, mime, src.name, created_at, blob_path, src)
 
             # Link row ties the artifact to this session/run/tool_call
@@ -139,6 +242,7 @@ def ingest_files(
             )
             conn.commit()
 
+            # Create artifact descriptor
             desc = {
                 "id": artifact_id,
                 "name": src.name,
@@ -173,11 +277,27 @@ def _upsert_artifact(
     src_file: Path,
 ) -> str:
     """
-    If sha256 already exists in 'artifacts', return its id.
-    Otherwise:
-      - copy bytes into blobstore (once)
-      - insert new artifacts row
-      - return new id
+    Upsert (insert or update) an artifact in the database.
+    
+    This function handles the core deduplication logic:
+    - If the SHA256 already exists, return the existing artifact ID
+    - If it's a new file, store it in blobstore and create a new database entry
+    
+    The "upsert" pattern ensures that identical file content is only stored once,
+    even if it's created multiple times by different agents or sessions.
+    
+    Args:
+        conn: Database connection
+        sha256: Content hash of the file
+        size: File size in bytes
+        mime: MIME type of the file
+        filename: Original filename
+        created_at: ISO timestamp
+        blob_path: Path where the file should be stored in blobstore
+        src_file: Source file path (for copying)
+    
+    Returns:
+        Artifact ID (either existing or newly created)
     """
     # Do we already know this sha?
     cur = conn.execute("SELECT id FROM artifacts WHERE sha256 = ?", (sha256,))
@@ -203,6 +323,17 @@ def _upsert_artifact(
 
 
 def _copy_bytes(src: Path, dst: Path, chunk_size: int = 1024 * 1024) -> None:
+    """
+    Copy file bytes from source to destination in chunks.
+    
+    This function efficiently copies large files without loading them entirely
+    into memory. It reads and writes in chunks to handle files of any size.
+    
+    Args:
+        src: Source file path
+        dst: Destination file path
+        chunk_size: Size of each chunk to read/write (default: 1MB)
+    """
     _ensure_parent(dst)
     if dst.exists():
         return
@@ -211,6 +342,15 @@ def _copy_bytes(src: Path, dst: Path, chunk_size: int = 1024 * 1024) -> None:
             fdst.write(chunk)
 
 def _safe_delete(path: Path) -> None:
+    """
+    Safely delete a file without crashing the ingestion process.
+    
+    This function attempts to delete a file but catches any exceptions.
+    It's used to clean up staging files after successful ingestion.
+    
+    Args:
+        path: Path to the file to delete
+    """
     try:
         path.unlink(missing_ok=True)
     except Exception:
