@@ -120,7 +120,7 @@ print(f"Successfully wrote {{file_path}}")
     data_b64 = base64.b64encode(data).decode('ascii')
     
     # Use larger chunks since we don't download huge files
-    chunk_size = 10000  # Base64 characters per chunk
+    chunk_size = 1000  # Base64 characters per chunk
     chunks = [data_b64[i:i+chunk_size] for i in range(0, len(data_b64), chunk_size)]
     
     # Create the file and write chunks
